@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.11)
 
-set(TINYGLUT_VERSION 0.3)
+set(TINYGLUT_VERSION 0.4)
 
 find_package(PkgConfig)
 
@@ -19,6 +19,7 @@ option(ENABLE_DUMMY "Enable/Disable Dummy platform" ON)
 option(ENABLE_DIRECTFB "Enable/Disable DirectFB platform" ON)
 option(ENABLE_X11 "Enable/Disable X11 platform" ON)
 option(ENABLE_FBDEV "Enable/Disable Linux FBDev platform" ON)
+option(ENABLE_WAYLAND "Enable/Disable Linux FBDev platform" ON)
 
 option(ENABLE_EGL "Enable/Disable EGL backend" ON)
 option(ENABLE_GLX "Enable/Disable OpenGL Extension to X11 backend" ON)
@@ -53,7 +54,14 @@ if(ENABLE_FBDEV)
   endif()
 endif()
 
-if(NOT ENABLE_DUMMY AND NOT ENABLE_X11 AND NOT ENABLE_X11 AND NOT ENABLE_FBDEV)
+if(ENABLE_WAYLAND)
+  pkg_check_modules(WAYLAND wayland-client xkbcommon)
+  if(NOT WAYLAND_FOUND)
+    set(ENABLE_WAYLAND OFF)
+  endif()
+endif()
+
+if(NOT ENABLE_DUMMY AND NOT ENABLE_X11 AND NOT ENABLE_X11 AND NOT ENABLE_FBDEV AND NOT ENABLE_WAYLAND)
   message(FATAL_ERROR "No platforms found")
 endif()
 
@@ -127,6 +135,12 @@ else()
   set(ENABLE_GLFBDEV OFF)
 endif()
 
+if(ENABLE_WAYLAND)
+  if(NOT ENABLE_EGL)
+    set(ENABLE_WAYLAND OFF)
+  endif()
+endif()
+
 if(ENABLE_GLX OR ENABLE_GLFBDEV)
   pkg_check_modules(GL gl)
   if(NOT GL_FOUND)
@@ -195,6 +209,13 @@ if(ENABLE_FBDEV)
   list(APPEND PLATFORMS_TARGETS fbdev_plugin)
   add_library(fbdev_plugin MODULE fbdev.c)
   target_link_libraries(fbdev_plugin -lpthread)
+endif()
+
+if(ENABLE_WAYLAND)
+  list(APPEND PLATFORMS_TARGETS wayland_plugin)
+  add_library(wayland_plugin MODULE wayland.c)
+  target_include_directories(wayland_plugin PRIVATE ${WAYLAND_INCLUDE_DIRS})
+  target_link_libraries(wayland_plugin ${WAYLAND_LDFLAGS})
 endif()
 
 set_target_properties(${PLATFORMS_TARGETS} PROPERTIES PREFIX "")

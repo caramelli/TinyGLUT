@@ -90,6 +90,8 @@ void glutInitWindowSize(int width, int height);
 void glutInitDisplayMode(unsigned int mode);
 int glutCreateWindow(const char *title);
 void glutSetWindow(int window);
+void glutSetWindowData(void *data);
+void *glutGetWindowData();
 void glutReshapeFunc(void (*func)(int width, int height));
 void glutDisplayFunc(void (*func)());
 void glutIdleFunc(void (*func)());

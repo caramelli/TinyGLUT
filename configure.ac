@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to create configure.
 
-AC_INIT(TinyGLUT, 0.3)
+AC_INIT(TinyGLUT, 0.4)
 
 AM_INIT_AUTOMAKE
 
@@ -31,6 +31,10 @@ AC_ARG_ENABLE(directfb,
 AC_ARG_ENABLE(fbdev,
               AS_HELP_STRING(--disable-fbdev, disable Linux FBDev platform),
               enable_fbdev=no, enable_fbdev=yes)
+AC_ARG_ENABLE(wayland,
+              AS_HELP_STRING(--disable-wayland, disable Wayland platform),
+              enable_wayland=no, enable_wayland=yes)
+
 
 AC_ARG_ENABLE(egl,
               AS_HELP_STRING(--disable-egl, disable EGL backend),
@@ -65,7 +69,11 @@ if test x$enable_fbdev = xyes; then
   AC_CHECK_HEADERS(linux/fb.h linux/input.h, , enable_fbdev=no)
 fi
 
-if test x$enable_dummy = xno -a x$enable_x11 = xno -a x$enable_directfb = xno -a x$enable_fbdev = xno; then
+if test x$enable_wayland = xyes; then
+  PKG_CHECK_MODULES(WAYLAND, wayland-client xkbcommon, , enable_wayland=no)
+fi
+
+if test x$enable_dummy = xno -a x$enable_x11 = xno -a x$enable_directfb = xno -a x$enable_fbdev = xno -a x$enable_wayland = xno; then
   AC_MSG_ERROR(No platforms found)
 fi
 
@@ -157,6 +165,7 @@ AM_CONDITIONAL(DUMMY, test x$enable_dummy = xyes)
 AM_CONDITIONAL(X11, test x$enable_x11 = xyes)
 AM_CONDITIONAL(DIRECTFB, test x$enable_directfb = xyes)
 AM_CONDITIONAL(FBDEV, test x$enable_fbdev = xyes)
+AM_CONDITIONAL(WAYLAND, test x$enable_wayland = xyes)
 
 AM_CONDITIONAL(EGL, test x$enable_egl = xyes)
 AM_CONDITIONAL(GLX, test x$enable_glx = xyes)

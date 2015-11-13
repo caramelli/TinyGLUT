@@ -55,6 +55,7 @@ typedef struct glutList {
 typedef struct {
   glutList entry;
   int win;
+  void *data;
   void (*reshape_cb)();
   void (*display_cb)();
   void (*keyboard_cb)(unsigned char, int, int);
@@ -291,6 +292,34 @@ void glutSetWindow(int window)
   }
 
   WINDOW_SET();
+}
+
+void glutSetWindowData(void *data)
+{
+  glut_err = 0;
+
+  WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
+
+  WINDOW_CONTEXT_GET(glut_win);
+
+  glut_win_ctx->data = data;
+}
+
+void *glutGetWindowData()
+{
+  glut_err = 0;
+
+  WINDOW_CHECK();
+  if (glut_err) {
+    return NULL;
+  }
+
+  WINDOW_CONTEXT_GET(glut_win);
+
+  return glut_win_ctx->data;
 }
 
 void glutReshapeFunc(void (*func)(int, int))

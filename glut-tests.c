@@ -238,6 +238,42 @@ START_TEST(test_glutSetWindow)
 }
 END_TEST
 
+/* glutSetWindowData test */
+
+START_TEST(test_glutSetWindowData)
+{
+  glutSetWindowData(NULL);
+  ck_assert_int_eq(glutGetError(), GLUT_BAD_WINDOW);
+
+  glutInit(NULL, NULL);
+  glut_win = glutCreateWindow(NULL);
+
+  glutSetWindowData(NULL);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
+  glutDestroyWindow(glut_win);
+  glutExit();
+}
+END_TEST
+
+/* glutGetWindowData test */
+
+START_TEST(test_glutGetWindowData)
+{
+  glutGetWindowData();
+  ck_assert_int_eq(glutGetError(), GLUT_BAD_WINDOW);
+
+  glutInit(NULL, NULL);
+  glut_win = glutCreateWindow(NULL);
+
+  glutGetWindowData();
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
+  glutDestroyWindow(glut_win);
+  glutExit();
+}
+END_TEST
+
 /* glutReshapeFunc test */
 
 START_TEST(test_glutReshapeFunc)
@@ -578,6 +614,8 @@ int main()
   tcase_add_test(tc, test_glutInitDisplayMode);
   tcase_add_test(tc, test_glutCreateWindow);
   tcase_add_test(tc, test_glutSetWindow);
+  tcase_add_test(tc, test_glutSetWindowData);
+  tcase_add_test(tc, test_glutGetWindowData);
   tcase_add_test(tc, test_glutReshapeFunc);
   tcase_add_test(tc, test_glutDisplayFunc);
   tcase_add_test(tc, test_glutIdleFunc);

@@ -34,6 +34,14 @@ fbdev_plugin_la_LIBADD = -lpthread
 fbdev_plugin_la_LDFLAGS = -module -avoid-version
 endif
 
+if WAYLAND
+platforms_LTLIBRARIES += wayland_plugin.la
+wayland_plugin_la_SOURCES = wayland.c
+wayland_plugin_la_CFLAGS = @WAYLAND_CFLAGS@
+wayland_plugin_la_LIBADD = @WAYLAND_LIBS@
+wayland_plugin_la_LDFLAGS = -module -avoid-version
+endif
+
 ####################
 # Backends plugins #
 ####################
