@@ -37,7 +37,7 @@
 #include <fiu-local.h>
 #define FIU_CHECK(ptr) \
   fiu_init(0); \
-  if (fiu_fail("ENOMEM")) { \
+  if (fiu_fail("BACKEND_ENOMEM")) { \
     free(ptr); \
     ptr = NULL; \
   }
@@ -51,10 +51,10 @@ typedef struct {
   struct attributes attribs;
   void *platform;
   int (*init)(int *width, int *height, int *err);
-  int (*create_window)(int dpy, int width, int height, int opt, int *err);
+  int (*create_window)(int dpy, int posx, int posy, int width, int height, int opt, int *err);
   void (*destroy_window)(int dpy, int win);
   void (*fini)(int dpy);
-  int (*get_event)(int dpy, int *type, int *key);
+  int (*get_event)(int dpy, int *type, int *key, int *x, int *y);
 } glutDisplay;
 
 typedef struct {
@@ -163,6 +163,14 @@ error:
   return 0;
 }
 
+void InitWindowPosition(int display, int posx, int posy)
+{
+  glutDisplay *glut_dpy = (glutDisplay *)display;
+
+  glut_dpy->attribs.win_posx = posx;
+  glut_dpy->attribs.win_posy = posy;
+}
+
 void InitWindowSize(int display, int width, int height)
 {
   glutDisplay *glut_dpy = (glutDisplay *)display;
@@ -233,7 +241,7 @@ int CreateWindow(int display)
     goto error;
   }
 
-  glut_win->native_win = (EGLNativeWindowType)glut_dpy->create_window((int)glut_dpy->native_dpy, glut_win->attribs.win_width, glut_win->attribs.win_height, 0, &err);
+  glut_win->native_win = (EGLNativeWindowType)glut_dpy->create_window((int)glut_dpy->native_dpy, glut_win->attribs.win_posx, glut_win->attribs.win_posy, glut_win->attribs.win_width, glut_win->attribs.win_height, 0, &err);
   if (err == -1) {
     goto error;
   }
@@ -274,12 +282,6 @@ int CreateWindow(int display)
     }
   }
 
-  err = eglMakeCurrent(glut_dpy->egl_dpy, glut_win->egl_win, glut_win->egl_win, glut_win->egl_ctx);
-  if (!err) {
-    printf("eglMakeCurrent error: 0x%x\n", eglGetError());
-    goto error;
-  }
-
   return (int)glut_win;
 
 error:
@@ -294,6 +296,23 @@ error:
   }
   free(glut_win);
   return 0;
+}
+
+void SetWindow(int display, int window, int context)
+{
+  int err = 0;
+  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutWindow *glut_win = (glutWindow *)window;
+
+  if (context) {
+    err = eglMakeCurrent(glut_dpy->egl_dpy, glut_win->egl_win, glut_win->egl_win, glut_win->egl_ctx);
+  }
+  else {
+    err = eglMakeCurrent(glut_dpy->egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+  }
+  if (!err) {
+    printf("eglMakeCurrent error: 0x%x\n", eglGetError());
+  }
 }
 
 void SwapBuffers(int display, int window)
@@ -323,8 +342,6 @@ void DestroyWindow(int display, int window)
   glutDisplay *glut_dpy = (glutDisplay *)display;
   glutWindow *glut_win = (glutWindow *)window;
 
-  eglMakeCurrent(glut_dpy->egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-
   eglDestroyContext(glut_dpy->egl_dpy, glut_win->egl_ctx);
 
   eglDestroySurface(glut_dpy->egl_dpy, glut_win->egl_win);
@@ -347,9 +364,9 @@ void Fini(int display)
   free(glut_dpy);
 }
 
-int GetEvent(int display, int *type, int *key)
+int GetEvent(int display, int *type, int *key, int *x, int *y)
 {
   glutDisplay *glut_dpy = (glutDisplay *)display;
 
-  return glut_dpy->get_event((int)glut_dpy->native_dpy, type, key);
+  return glut_dpy->get_event((int)glut_dpy->native_dpy, type, key, x, y);
 }

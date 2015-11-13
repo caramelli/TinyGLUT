@@ -40,18 +40,23 @@ extern "C" {
 #define GLUT_BAD_DISPLAY         0x0004
 #define GLUT_BAD_WINDOW          0x0005
 #define GLUT_BAD_VALUE           0x0006
+#define GLUT_BAD_ALLOC           0x0007
 
 /* Display mode */
 #define GLUT_DOUBLE              0x0002
 #define GLUT_DEPTH               0x0010
 
 /* Get query */
+#define GLUT_WINDOW_X            0x0064
+#define GLUT_WINDOW_Y            0x0065
 #define GLUT_WINDOW_WIDTH        0x0066
 #define GLUT_WINDOW_HEIGHT       0x0067
 #define GLUT_WINDOW_DEPTH_SIZE   0x006A
 #define GLUT_WINDOW_DOUBLEBUFFER 0x0073
 #define GLUT_SCREEN_WIDTH        0x00C8
 #define GLUT_SCREEN_HEIGHT       0x00C9
+#define GLUT_INIT_WINDOW_X       0x01F4
+#define GLUT_INIT_WINDOW_Y       0x01F5
 #define GLUT_INIT_WINDOW_WIDTH   0x01F6
 #define GLUT_INIT_WINDOW_HEIGHT  0x01F7
 #define GLUT_INIT_DISPLAY_MODE   0x01F8
@@ -80,14 +85,17 @@ extern "C" {
 /* Functions */
 int glutGetError();
 void glutInit(int *argc, char **argv);
+void glutInitWindowPosition(int posx, int posy);
 void glutInitWindowSize(int width, int height);
 void glutInitDisplayMode(unsigned int mode);
 int glutCreateWindow(const char *title);
+void glutSetWindow(int window);
 void glutReshapeFunc(void (*func)(int width, int height));
 void glutDisplayFunc(void (*func)());
 void glutIdleFunc(void (*func)());
 void glutKeyboardFunc(void (*func)(unsigned char key, int x, int y));
 void glutSpecialFunc(void (*func)(int key, int x, int y));
+void glutPassiveMotionFunc(void (*func)(int x, int y));
 void glutSwapBuffers();
 void glutPostRedisplay();
 int glutGet(int query);

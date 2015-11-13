@@ -28,6 +28,8 @@
 struct attributes {
   int dpy_width;
   int dpy_height;
+  int win_posx;
+  int win_posy;
   int win_width;
   int win_height;
   int double_buffer;

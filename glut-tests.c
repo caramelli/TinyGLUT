@@ -35,7 +35,7 @@
 #include <linux/uinput.h>
 #include "glut.h"
 
-static int glut_win = 0, uinput = 0;
+static int glut_win = 0, uinput_keyboard = 0, uinput_mouse = 0;
 
 static void sighandler_quit(int signum)
 {
@@ -47,20 +47,30 @@ static void sighandler_input(int signum)
   struct input_event event;
   memset(&event, 0, sizeof(struct input_event));
 
+  event.type = EV_REL;
+  event.code = REL_X;
+  event.value = 1;
+  write(uinput_mouse, &event, sizeof(struct input_event));
+  sleep(1);
+  event.code = REL_Y;
+  event.value = 1;
+  write(uinput_mouse, &event, sizeof(struct input_event));
+  sleep(1);
+
   event.type = EV_KEY;
   event.code = KEY_F1;
   event.value = 1;
-  write(uinput, &event, sizeof(struct input_event));
+  write(uinput_keyboard, &event, sizeof(struct input_event));
   sleep(1);
   event.value = 0;
-  write(uinput, &event, sizeof(struct input_event));
+  write(uinput_keyboard, &event, sizeof(struct input_event));
   sleep(1);
   event.code = KEY_ESC;
   event.value = 1;
-  write(uinput, &event, sizeof(struct input_event));
+  write(uinput_keyboard, &event, sizeof(struct input_event));
   sleep(1);
   event.value = 0;
-  write(uinput, &event, sizeof(struct input_event));
+  write(uinput_keyboard, &event, sizeof(struct input_event));
   sleep(1);
 }
 
@@ -94,6 +104,11 @@ static void glutSpecial(int key, int x, int y)
   }
 }
 
+static void glutPassiveMotion(int x, int y)
+{
+  printf("x = %d, y = %d\n", x, y);
+}
+
 /* glutInit test */
 
 START_TEST(test_glutInit)
@@ -112,12 +127,28 @@ START_TEST(test_glutInit)
   ck_assert_int_eq(glutGetError(), GLUT_BAD_BACKEND);
   setenv("GLUT_BACKEND", backend, 1);
 
-  fiu_enable("ENOMEM", 1, NULL, FIU_ONETIME);
+  fiu_enable("BACKEND_ENOMEM", 1, NULL, FIU_ONETIME);
   glutInit(NULL, NULL);
   ck_assert_int_eq(glutGetError(), GLUT_BAD_DISPLAY);
 
   glutInit(NULL, NULL);
   ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+  glutExit();
+}
+END_TEST
+
+/* glutInitWindowPosition test */
+
+START_TEST(test_glutInitWindowPosition)
+{
+  glutInitWindowPosition(0, 0);
+  ck_assert_int_eq(glutGetError(), GLUT_BAD_DISPLAY);
+
+  glutInit(NULL, NULL);
+
+  glutInitWindowPosition(0, 0);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
   glutExit();
 }
 END_TEST
@@ -168,12 +199,11 @@ START_TEST(test_glutCreateWindow)
 
   glutInit(NULL, NULL);
 
-  glut_win = glutCreateWindow(NULL);
-  glutCreateWindow(NULL);
-  ck_assert_int_eq(glutGetError(), GLUT_WINDOW_EXIST);
-  glutDestroyWindow(glut_win);
-
   fiu_enable("ENOMEM", 1, NULL, FIU_ONETIME);
+  glutCreateWindow(NULL);
+  ck_assert_int_eq(glutGetError(), GLUT_BAD_ALLOC);
+
+  fiu_enable("BACKEND_ENOMEM", 1, NULL, FIU_ONETIME);
   glutCreateWindow(NULL);
   ck_assert_int_eq(glutGetError(), GLUT_BAD_WINDOW);
 
@@ -181,6 +211,29 @@ START_TEST(test_glutCreateWindow)
   ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
   glutDestroyWindow(glut_win);
 
+  glutExit();
+}
+END_TEST
+
+/* glutSetWindow test */
+
+START_TEST(test_glutSetWindow)
+{
+  glutSetWindow(0);
+  ck_assert_int_eq(glutGetError(), GLUT_BAD_WINDOW);
+
+  glutInit(NULL, NULL);
+  glut_win = glutCreateWindow(NULL);
+  int glut_win2 = glutCreateWindow(NULL);
+
+  glutSetWindow(0);
+  ck_assert_int_eq(glutGetError(), GLUT_BAD_VALUE);
+
+  glutSetWindow(glut_win);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
+  glutDestroyWindow(glut_win);
+  glutDestroyWindow(glut_win2);
   glutExit();
 }
 END_TEST
@@ -275,6 +328,24 @@ START_TEST(test_glutSpecialFunc)
 }
 END_TEST
 
+/* glutPassiveMotionFunc test */
+
+START_TEST(test_glutPassiveMotionFunc)
+{
+  glutPassiveMotionFunc(glutPassiveMotion);
+  ck_assert_int_eq(glutGetError(), GLUT_BAD_WINDOW);
+
+  glutInit(NULL, NULL);
+  glut_win = glutCreateWindow(NULL);
+
+  glutPassiveMotionFunc(glutPassiveMotion);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
+  glutDestroyWindow(glut_win);
+  glutExit();
+}
+END_TEST
+
 /* glutSwapBuffers test */
 
 START_TEST(test_glutSwapBuffers)
@@ -336,6 +407,12 @@ START_TEST(test_glutGet)
   glutGet(GLUT_SCREEN_HEIGHT);
   ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
 
+  glutGet(GLUT_INIT_WINDOW_X);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
+  glutGet(GLUT_INIT_WINDOW_Y);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
   glutGet(GLUT_INIT_WINDOW_WIDTH);
   ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
 
@@ -349,6 +426,12 @@ START_TEST(test_glutGet)
   ck_assert_int_eq(glutGetError(), GLUT_BAD_WINDOW);
 
   glut_win = glutCreateWindow(NULL);
+
+  glutGet(GLUT_WINDOW_X);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
+
+  glutGet(GLUT_WINDOW_Y);
+  ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
 
   glutGet(GLUT_WINDOW_WIDTH);
   ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
@@ -444,13 +527,20 @@ START_TEST(test_glutMainLoop)
 
   struct uinput_user_dev dev;
   memset(&dev, 0, sizeof(struct uinput_user_dev));
-  uinput = open("/dev/uinput", O_WRONLY);
-  strcpy(dev.name, "uinput");
-  write(uinput, &dev, sizeof(struct uinput_user_dev));
-  ioctl(uinput, UI_SET_EVBIT, EV_KEY);
-  ioctl(uinput, UI_SET_KEYBIT, KEY_ESC);
-  ioctl(uinput, UI_SET_KEYBIT, KEY_F1);
-  ioctl(uinput, UI_DEV_CREATE);
+  uinput_keyboard = open("/dev/uinput", O_WRONLY);
+  strcpy(dev.name, "uinput-keyboard");
+  write(uinput_keyboard, &dev, sizeof(struct uinput_user_dev));
+  ioctl(uinput_keyboard, UI_SET_EVBIT, EV_KEY);
+  ioctl(uinput_keyboard, UI_SET_KEYBIT, KEY_ESC);
+  ioctl(uinput_keyboard, UI_SET_KEYBIT, KEY_F1);
+  ioctl(uinput_keyboard, UI_DEV_CREATE);
+  uinput_mouse = open("/dev/uinput", O_WRONLY);
+  strcpy(dev.name, "uinput-mouse");
+  write(uinput_mouse, &dev, sizeof(struct uinput_user_dev));
+  ioctl(uinput_mouse, UI_SET_EVBIT, EV_REL);
+  ioctl(uinput_mouse, UI_SET_RELBIT, REL_X);
+  ioctl(uinput_mouse, UI_SET_RELBIT, REL_Y);
+  ioctl(uinput_mouse, UI_DEV_CREATE);
   glutInit(NULL, NULL);
   glut_win = glutCreateWindow(NULL);
   glutReshapeFunc(glutReshape);
@@ -458,12 +548,15 @@ START_TEST(test_glutMainLoop)
   glutIdleFunc(glutIdle);
   glutKeyboardFunc(glutKeyboard);
   glutSpecialFunc(glutSpecial);
+  glutPassiveMotionFunc(glutPassiveMotion);
   signal(SIGALRM, sighandler_input);
   alarm(1);
   glutMainLoop();
   ck_assert_int_eq(glutGetError(), GLUT_SUCCESS);
-  ioctl(uinput, UI_DEV_DESTROY);
-  close(uinput);
+  ioctl(uinput_mouse, UI_DEV_DESTROY);
+  close(uinput_mouse);
+  ioctl(uinput_keyboard, UI_DEV_DESTROY);
+  close(uinput_keyboard);
 }
 END_TEST
 
@@ -478,16 +571,19 @@ int main()
 
   s = suite_create("TinyGLUT");
   tc = tcase_create("Tests");
-  tcase_set_timeout(tc, 8);
+  tcase_set_timeout(tc, 10);
   tcase_add_test(tc, test_glutInit);
+  tcase_add_test(tc, test_glutInitWindowPosition);
   tcase_add_test(tc, test_glutInitWindowSize);
   tcase_add_test(tc, test_glutInitDisplayMode);
   tcase_add_test(tc, test_glutCreateWindow);
+  tcase_add_test(tc, test_glutSetWindow);
   tcase_add_test(tc, test_glutReshapeFunc);
   tcase_add_test(tc, test_glutDisplayFunc);
   tcase_add_test(tc, test_glutIdleFunc);
   tcase_add_test(tc, test_glutKeyboardFunc);
   tcase_add_test(tc, test_glutSpecialFunc);
+  tcase_add_test(tc, test_glutPassiveMotionFunc);
   tcase_add_test(tc, test_glutSwapBuffers);
   tcase_add_test(tc, test_glutPostRedisplay);
   tcase_add_test(tc, test_glutGet);

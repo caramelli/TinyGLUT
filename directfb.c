@@ -31,15 +31,20 @@
 
 typedef struct {
   IDirectFBEventBuffer *event_buffer;
-  int expose;
+  IDirectFBDisplayLayer *layer;
 } DFBPrivate;
+
+typedef struct {
+  IDirectFBSurface *surface;
+  int expose;
+} DFBWindowProperty;
 
 int init(int *width, int *height, int *err)
 {
   int ret = 0;
   IDirectFB *dfb = NULL;
   DFBPrivate *private = NULL;
-  IDirectFBScreen *screen = NULL;
+  DFBDisplayLayerConfig layer_config;
 
   ret = DirectFBInit(NULL, NULL);
   if (ret) {
@@ -61,37 +66,36 @@ int init(int *width, int *height, int *err)
 
   dfb->refs = (int)private;
 
-  ret = dfb->CreateInputEventBuffer(dfb, DICAPS_KEYS, DFB_FALSE, &private->event_buffer);
+  ret = dfb->CreateEventBuffer(dfb, &private->event_buffer);
   if (ret) {
-    printf("CreateInputEventBuffer failed: %s\n", DirectFBErrorString(ret));
+    printf("CreateEventBuffer failed: %s\n", DirectFBErrorString(ret));
     goto fail;
   }
 
-  ret = dfb->GetScreen(dfb, DSCID_PRIMARY, &screen);
+  ret = dfb->GetDisplayLayer(dfb, DLID_PRIMARY, &private->layer);
   if (ret) {
-    printf("GetScreen failed: %s\n", DirectFBErrorString(ret));
+    printf("GetDisplayLayer failed: %s\n", DirectFBErrorString(ret));
     goto fail;
   }
 
-  ret = screen->GetSize(screen, width, height);
+  memset(&layer_config, 0, sizeof(DFBDisplayLayerConfig));
+  ret = private->layer->GetConfiguration(private->layer, &layer_config);
   if (ret) {
-    printf("GetSize failed: %s\n", DirectFBErrorString(ret));
+    printf("GetConfiguration failed: %s\n", DirectFBErrorString(ret));
     goto fail;
   }
 
-  screen->Release(screen);
+  *width = layer_config.width;
+  *height = layer_config.height;
 
   *err = 0;
 
   return (int)dfb;
 
 fail:
-  if (screen) {
-    screen->Release(screen);
-  }
   if (private) {
-    if (private->event_buffer) {
-      private->event_buffer->Release(private->event_buffer);
+    if (private->layer) {
+      private->layer->Release(private->layer);
     }
     free(private);
   }
@@ -102,21 +106,72 @@ fail:
   return 0;
 }
 
-int create_window(int dpy, int width, int height, int opt, int *err)
+int create_window(int dpy, int posx, int posy, int width, int height, int opt, int *err)
 {
   int ret = 0;
   IDirectFB *dfb = (IDirectFB *)dpy;
-  DFBSurfaceDescription desc;
+  DFBPrivate *private = NULL;
+  DFBWindowDescription desc;
+  IDirectFBWindow *window = NULL;
   IDirectFBSurface *surface = NULL;
+  DFBWindowProperty *property = NULL;
 
-  memset(&desc, 0, sizeof(DFBSurfaceDescription));
-  desc.flags = DSDESC_CAPS | DSDESC_WIDTH | DSDESC_HEIGHT;
-  desc.caps = DSCAPS_PRIMARY | opt;
+  private = (DFBPrivate *)dfb->refs;
+
+  memset(&desc, 0, sizeof(DFBWindowDescription));
+  desc.flags = DWDESC_SURFACE_CAPS | DWDESC_WIDTH | DWDESC_HEIGHT | DWDESC_POSX | DWDESC_POSY;
+  desc.surface_caps = opt;
   desc.width = width;
   desc.height = height;
-  ret = dfb->CreateSurface(dfb, &desc, &surface);
+  desc.posx = posx;
+  desc.posy = posy;
+  ret = private->layer->CreateWindow(private->layer, &desc, &window);
   if (ret) {
-    printf("CreateSurface failed: %s\n", DirectFBErrorString(ret));
+    printf("CreateWindow failed: %s\n", DirectFBErrorString(ret));
+    goto fail;
+  }
+
+  ret = window->GetSurface(window, &surface);
+  if (ret) {
+    printf("GetSurface failed: %s\n", DirectFBErrorString(ret));
+    goto fail;
+  }
+
+  ret = window->DisableEvents(window, DWET_ALL ^ (DWET_GOTFOCUS | DWET_KEYDOWN | DWET_MOTION));
+  if (ret) {
+    printf("DisableEvents failed: %s\n", DirectFBErrorString(ret));
+    goto fail;
+  }
+
+  ret = window->AttachEventBuffer(window, private->event_buffer);
+  if (ret) {
+    printf("AttachEventBuffer failed: %s\n", DirectFBErrorString(ret));
+    goto fail;
+  }
+
+  ret = window->SetOpacity(window, 0xff);
+  if (ret) {
+    printf("SetOpacity failed: %s\n", DirectFBErrorString(ret));
+    goto fail;
+  }
+
+  ret = window->RequestFocus(window);
+  if (ret) {
+    printf("RequestFocus failed: %s\n", DirectFBErrorString(ret));
+    goto fail;
+  }
+
+  property = calloc(1, sizeof(DFBWindowProperty));
+  if (!property) {
+    printf("DFBWindowProperty calloc failed\n");
+    goto fail;
+  }
+
+  property->surface = surface;
+
+  ret = window->SetProperty(window, "property", property, NULL);
+  if (ret) {
+    printf("SetProperty failed: %s\n", DirectFBErrorString(ret));
     goto fail;
   }
 
@@ -125,6 +180,15 @@ int create_window(int dpy, int width, int height, int opt, int *err)
   return (int)surface;
 
 fail:
+  if (property) {
+    free(property);
+  }
+  if (surface) {
+    surface->Release(surface);
+  }
+  if (window) {
+    window->Release(window);
+  }
   *err = -1;
   return 0;
 }
@@ -142,30 +206,38 @@ void fini(int dpy)
   DFBPrivate *private = NULL;
 
   private = (DFBPrivate *)dfb->refs;
+  private->layer->Release(private->layer);
   private->event_buffer->Release(private->event_buffer);
   free(private);
   dfb->Release(dfb);
 }
 
-int get_event(int dpy, int *type, int *key)
+int get_event(int dpy, int *type, int *key, int *x, int *y)
 {
   IDirectFB *dfb = (IDirectFB *)dpy;
   DFBPrivate *private = NULL;
-  DFBInputEvent event;
+  IDirectFBWindow *window = NULL;
+  DFBWindowEvent event;
+  DFBWindowProperty *property = NULL;
   int win = 0;
 
   private = (DFBPrivate *)dfb->refs;
 
   *type = EVENT_NONE;
-  *key = 0;
+  *key = *x = *y = 0;
 
-  if (!private->expose) {
-    private->expose = 1;
-    *type = EVENT_DISPLAY;
-  }
-  else {
-    memset(&event, 0, sizeof(DFBInputEvent));
-    if (!private->event_buffer->GetEvent(private->event_buffer, (DFBEvent *)&event) && event.type == DIET_KEYPRESS) {
+  memset(&event, 0, sizeof(DFBWindowEvent));
+  if (!private->event_buffer->GetEvent(private->event_buffer, (DFBEvent *)&event)) {
+    private->layer->GetWindow(private->layer, event.window_id, &window);
+    window->GetProperty(window, "property", (void *)&property);
+    if (event.type == DWET_GOTFOCUS) {
+      if (!property->expose) {
+        property->expose = 1;
+        window->SetProperty(window, "property", property, NULL);
+        *type = EVENT_DISPLAY;
+      }
+    }
+    else if (event.type == DWET_KEYDOWN) {
       switch (event.key_symbol) {
         case DIKS_F1:           *key = F1;        break;
         case DIKS_F2:           *key = F2;        break;
@@ -195,10 +267,15 @@ int get_event(int dpy, int *type, int *key)
         *type = EVENT_SPECIAL;
       }
     }
+    else if (event.type == DWET_MOTION) {
+      *x = event.x;
+      *y = event.y;
+      *type = EVENT_PASSIVEMOTION;
+    }
   }
 
   if (*type) {
-    win = 1;
+    win = (int)property->surface;
   }
 
   return win;

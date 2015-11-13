@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include "event.h"
 
-static int expose = 0;
+static int expose;
 
 int init(int *width, int *height, int *err)
 {
@@ -50,8 +50,10 @@ fail:
   return 0;
 }
 
-int create_window(int display, int width, int height, int opt, int *err)
+int create_window(int display, int posx, int posy, int width, int height, int opt, int *err)
 {
+  expose = 0;
+
   *err = 0;
 
   return 0;
@@ -59,19 +61,19 @@ int create_window(int display, int width, int height, int opt, int *err)
 
 void destroy_window(int display, int window)
 {
+  expose = 0;
 }
 
 void fini(int display)
 {
-  expose = 0;
 }
 
-int get_event(int display, int *type, int *key)
+int get_event(int display, int *type, int *key, int *x, int *y)
 {
   int ret = 0;
 
   *type = EVENT_NONE;
-  *key = 0;
+  *key = *x = *y = 0;
 
   if (!expose) {
     *type = EVENT_DISPLAY;

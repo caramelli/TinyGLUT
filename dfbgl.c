@@ -32,7 +32,7 @@
 #include <fiu-local.h>
 #define FIU_CHECK(ptr) \
   fiu_init(0); \
-  if (fiu_fail("ENOMEM")) { \
+  if (fiu_fail("BACKEND_ENOMEM")) { \
     free(ptr); \
     ptr = NULL; \
   }
@@ -41,13 +41,14 @@
 #endif
 
 int init(int *width, int *height, int *err);
-int create_window(int dpy, int width, int height, int opt, int *err);
+int create_window(int dpy, int posx, int posy, int width, int height, int opt, int *err);
 void destroy_window(int dpy, int win);
 void fini(int dpy);
-int get_event(int dpy, int *type, int *key);
+int get_event(int dpy, int *type, int *key, int *x, int *y);
 
 typedef struct {
   IDirectFB *directfb_dpy;
+  IDirectFBGL *dfbgl_ctx;
   struct attributes attribs;
 } glutDisplay;
 
@@ -82,6 +83,14 @@ int Init()
 error:
   free(glut_dpy);
   return 0;
+}
+
+void InitWindowPosition(int display, int posx, int posy)
+{
+  glutDisplay *glut_dpy = (glutDisplay *)display;
+
+  glut_dpy->attribs.win_posx = posx;
+  glut_dpy->attribs.win_posy = posy;
 }
 
 void InitWindowSize(int display, int width, int height)
@@ -123,7 +132,7 @@ int CreateWindow(int display)
     opt |= DSCAPS_DEPTH;
   }
 
-  glut_win->directfb_win = (IDirectFBSurface *)create_window((int)glut_dpy->directfb_dpy, glut_win->attribs.win_width, glut_win->attribs.win_height, opt, &err);
+  glut_win->directfb_win = (IDirectFBSurface *)create_window((int)glut_dpy->directfb_dpy, glut_win->attribs.win_posx, glut_win->attribs.win_posy, glut_win->attribs.win_width, glut_win->attribs.win_height, opt, &err);
   if (err == -1) {
     goto error;
   }
@@ -146,12 +155,6 @@ int CreateWindow(int display)
     }
   }
 
-  err = glut_win->dfbgl_ctx->Lock(glut_win->dfbgl_ctx);
-  if (err) {
-    printf("Lock error\n");
-    goto error;
-  }
-
   return (int)glut_win;
 
 error:
@@ -163,6 +166,27 @@ error:
   }
   free(glut_win);
   return 0;
+}
+
+void SetWindow(int display, int window, int context)
+{
+  int err = 0;
+  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutWindow *glut_win = (glutWindow *)window;
+
+  if (context) {
+    if (glut_dpy->dfbgl_ctx) {
+      err = glut_dpy->dfbgl_ctx->Unlock(glut_dpy->dfbgl_ctx);
+    }
+    err = glut_win->dfbgl_ctx->Lock(glut_win->dfbgl_ctx);
+    glut_dpy->dfbgl_ctx = glut_win->dfbgl_ctx;
+  }
+  else {
+    err = glut_win->dfbgl_ctx->Unlock(glut_win->dfbgl_ctx);
+  }
+  if (err) {
+    printf("Lock/Unlock error\n");
+  }
 }
 
 void SwapBuffers(int display, int window)
@@ -191,8 +215,6 @@ void DestroyWindow(int display, int window)
   glutDisplay *glut_dpy = (glutDisplay *)display;
   glutWindow *glut_win = (glutWindow *)window;
 
-  glut_win->dfbgl_ctx->Unlock(glut_win->dfbgl_ctx);
-
   glut_win->dfbgl_ctx->Release(glut_win->dfbgl_ctx);
 
   destroy_window((int)glut_dpy->directfb_dpy, (int)glut_win->directfb_win);
@@ -209,9 +231,9 @@ void Fini(int display)
   free(glut_dpy);
 }
 
-int GetEvent(int display, int *type, int *key)
+int GetEvent(int display, int *type, int *key, int *x, int *y)
 {
   glutDisplay *glut_dpy = (glutDisplay *)display;
 
-  return get_event((int)glut_dpy->directfb_dpy, type, key);
+  return get_event((int)glut_dpy->directfb_dpy, type, key, x, y);
 }

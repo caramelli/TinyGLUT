@@ -30,6 +30,7 @@ endif
 if FBDEV
 platforms_LTLIBRARIES += fbdev_plugin.la
 fbdev_plugin_la_SOURCES = fbdev.c
+fbdev_plugin_la_LIBADD = -lpthread
 fbdev_plugin_la_LDFLAGS = -module -avoid-version
 endif
 
@@ -81,8 +82,8 @@ endif
 
 lib_LTLIBRARIES = libglut.la
 libglut_la_SOURCES = glut.c
-libglut_la_CFLAGS = -DBACKENDSDIR=\"$(backendsdir)\"
-libglut_la_LIBADD = -ldl
+libglut_la_CFLAGS = -DBACKENDSDIR=\"$(backendsdir)\" @LIBFIU_CFLAGS@
+libglut_la_LIBADD =  @LIBFIU_LIBS@ -ldl
 libglut_la_LDFLAGS = -version-info 3:0:0
 
 glutincludedir = $(includedir)/GL

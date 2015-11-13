@@ -27,29 +27,180 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <linux/fb.h>
 #include <linux/input.h>
+#include <sys/mman.h>
 #include "event.h"
 #include "keys.h"
+
+#define MAX(a,b) a > b ? a : b
+
+#define W 4
+#define H 6
+
+struct fb_list {
+  struct fb_list *next;
+  struct fb_list *prev;
+};
 
 struct fb_window {
   int width;
   int height;
   int posx;
   int posy;
+  struct fb_list link;
 };
+
+enum {
+  FB_EVENT_EXPOSE,
+  FB_EVENT_KEYBOARD,
+  FB_EVENT_MOUSE
+};
+
+struct fb_event {
+  int type;
+  int keycode;
+  int x;
+  int y;
+  struct fb_window *window;
+  struct fb_list link;
+};
+
+struct fb_user_data {
+  int bpp;
+  int w;
+  int h;
+  unsigned char *screen;
+  int cx;
+  int cy;
+  int cw;
+  int ch;
+  unsigned char *cursor;
+  int keyboard;
+  int mouse;
+  struct fb_list window_list;
+  struct fb_list event_list;
+  int pipe[2];
+  pthread_t thread;
+};
+
+static void *input_thread(void *data)
+{
+  struct fb_user_data *user_data = data;
+  fd_set set;
+  struct input_event input;
+  int i = 0;
+  unsigned char *ptr = NULL;
+  struct fb_window *window = NULL;
+  struct fb_list *window_link = NULL;
+  struct fb_event *event = NULL;
+  struct fb_list *event_link = NULL;
+
+  while (1) {
+    FD_ZERO(&set);
+    FD_SET(user_data->pipe[0], &set);
+    FD_SET(user_data->keyboard, &set);
+    FD_SET(user_data->mouse, &set);
+
+    if (select(MAX(MAX(user_data->keyboard, user_data->mouse), user_data->pipe[0]) + 1, &set, NULL, NULL, NULL) >= 0) {
+      memset(&input, 0, sizeof(struct input_event));
+
+      if (FD_ISSET(user_data->keyboard, &set)) {
+        read(user_data->keyboard, &input, sizeof(struct input_event));
+      }
+      else if (FD_ISSET(user_data->mouse, &set)) {
+        read(user_data->mouse, &input, sizeof(struct input_event));
+      }
+      else if (FD_ISSET(user_data->pipe[0], &set)) {
+        break;
+      }
+
+      if (input.type == EV_REL) {
+        ptr = user_data->screen + (user_data->cy - H) * user_data->w * user_data->bpp + (user_data->cx - W) * user_data->bpp;
+        for (i = 0; i < user_data->ch; i++) {
+          memcpy(ptr, user_data->cursor + i * user_data->cw * user_data->bpp, user_data->cw * user_data->bpp);
+          ptr += user_data->w * user_data->bpp;
+        }
+
+        if (input.code == REL_X) {
+          user_data->cx += input.value;
+          user_data->cx = user_data->cx < W ? W : user_data->cx;
+          user_data->cx = user_data->cx > user_data->w - W - 1 ? user_data->w - W - 1 : user_data->cx;
+        }
+
+        if (input.code == REL_Y) {
+          user_data->cy += input.value;
+          user_data->cy = user_data->cy < H ? H : user_data->cy;
+          user_data->cy = user_data->cy > user_data->h - H - 1 ? user_data->h - H - 1 : user_data->cy;
+        }
+
+        ptr = user_data->screen + (user_data->cy - H) * user_data->w * user_data->bpp + (user_data->cx - W) * user_data->bpp;
+        for (i = 0; i < user_data->ch; i++) {
+          memcpy(user_data->cursor + i * user_data->cw * user_data->bpp, ptr, user_data->cw * user_data->bpp);
+          ptr += user_data->w * user_data->bpp;
+        }
+
+        ptr = user_data->screen + (user_data->cy - H) * user_data->w * user_data->bpp + (user_data->cx - W) * user_data->bpp;
+        for (i = 0; i < user_data->ch; i++) {
+          memset(ptr, 255, user_data->cw * user_data->bpp);
+          ptr += user_data->w * user_data->bpp;
+        }
+      }
+
+      if ((input.type == EV_KEY && input.value) || input.type == EV_REL) {
+        for (window_link = user_data->window_list.next; window_link != &user_data->window_list; window_link = window_link->next) {
+          window = (struct fb_window *)((char *)window_link - (char *)&((struct fb_window *)NULL)->link);
+
+          if (user_data->cx >= window->posx && user_data->cx < window->posx + window->width - 1 && user_data->cy >= window->posy && user_data->cy < window->posy + window->height - 1) {
+            event = calloc(1, sizeof(struct fb_event));
+            if (!event) {
+              printf("event calloc failed\n");
+            }
+
+            if (input.type == EV_KEY) {
+              event->type = FB_EVENT_KEYBOARD;
+              event->keycode = input.code;
+            }
+
+            if (input.type == EV_REL) {
+              event->type = FB_EVENT_MOUSE;
+              event->x = user_data->cx - window->posx;
+              event->y = user_data->cy - window->posy;
+            }
+
+            event->window = window;
+            event_link = &event->link;
+            event_link->next = user_data->event_list.next;
+            event_link->prev = &user_data->event_list;
+            user_data->event_list.next->prev = event_link;
+            user_data->event_list.next = event_link;
+            break;
+          }
+        }
+      }
+    }
+    else {
+      printf("select failed: %s\n", strerror(errno));
+    }
+  }
+
+  return NULL;
+}
 
 int init(int *width, int *height, int *err)
 {
   int ret = 0;
   int fb = -1;
+  struct fb_user_data *user_data = NULL;
   struct fb_var_screeninfo info;
   int i = 0;
   char name[32], path[32];
+  unsigned char *ptr = NULL;
 
   if (getenv("FRAMEBUFFER")) {
     fb = open(getenv("FRAMEBUFFER"), O_RDWR);
@@ -66,6 +217,16 @@ int init(int *width, int *height, int *err)
     }
   }
 
+  user_data = calloc(1, sizeof(struct fb_user_data));
+  if (!user_data) {
+    printf("user_data calloc failed\n");
+    goto fail;
+  }
+  else {
+    user_data->keyboard = -1;
+    user_data->mouse = -1;
+  }
+
   memset(&info, 0, sizeof(struct fb_var_screeninfo));
   ret = ioctl(fb, FBIOGET_VSCREENINFO, &info);
   if (ret == -1) {
@@ -73,7 +234,7 @@ int init(int *width, int *height, int *err)
     goto fail;
   }
 
-  info.reserved[0] = -1;
+  info.reserved[0] = (int)user_data;
   ret = ioctl(fb, FBIOPUT_VSCREENINFO, &info);
   if (ret == -1) {
     printf("ioctl FBIOPUT_VSCREENINFO failed: %s\n", strerror(errno));
@@ -85,38 +246,103 @@ int init(int *width, int *height, int *err)
     goto fail;
   }
 
+  user_data->bpp = info.bits_per_pixel >> 3;
+
+  user_data->w = info.xres;
+  user_data->h = info.yres;
+  user_data->screen = mmap(NULL, user_data->w * user_data->h * user_data->bpp, PROT_WRITE, MAP_SHARED, fb, 0);
+
+  user_data->cx = info.xres >> 1;
+  user_data->cy = info.yres >> 1;
+
+  user_data->cw = 2 * W + 1;
+  user_data->ch = 2 * H + 1;
+  user_data->cursor = calloc(user_data->cw * user_data->ch, user_data->bpp);
+  if (!user_data->cursor) {
+    printf("cursor calloc failed\n");
+    goto fail;
+  }
+
+  ptr = user_data->screen + (user_data->cy - H) * user_data->w * user_data->bpp + (user_data->cx - W) * user_data->bpp;
+  for (i = 0; i < user_data->ch; i++) {
+    memcpy(user_data->cursor + i * user_data->cw * user_data->bpp, ptr, user_data->cw * user_data->bpp);
+    memset(ptr, 255, user_data->cw * user_data->bpp);
+    ptr += user_data->w * user_data->bpp;
+  }
+
   if (getenv("KEYBOARD")) {
-    info.reserved[0] = open(getenv("KEYBOARD"), O_RDONLY | O_NONBLOCK);
-    if (info.reserved[0] == -1) {
+    user_data->keyboard = open(getenv("KEYBOARD"), O_RDONLY);
+    if (user_data->keyboard == -1) {
       printf("open %s failed: %s\n", getenv("KEYBOARD"), strerror(errno));
       goto fail;
     }
   }
   else {
+    i = 0;
     while (1) {
       sprintf(path, "/dev/input/event%d", i);
-      info.reserved[0] = open(path, O_RDONLY);
-      if (info.reserved[0] == -1) {
+      user_data->keyboard = open(path, O_RDONLY);
+      if (user_data->keyboard == -1) {
         sprintf(path, "/dev/input/event0");
         break;
       }
-      ioctl(info.reserved[0], EVIOCGNAME(sizeof(name)), name);
-      close(info.reserved[0]);
-      if (!strcmp(name, "uinput")) {
+      ioctl(user_data->keyboard, EVIOCGNAME(sizeof(name)), name);
+      close(user_data->keyboard);
+      if (!strcmp(name, "uinput-keyboard")) {
         break;
       }
       i++;
     }
-    info.reserved[0] = open(path, O_RDONLY | O_NONBLOCK);
-    if (info.reserved[0] == -1) {
+    user_data->keyboard = open(path, O_RDONLY);
+    if (user_data->keyboard == -1) {
       printf("open %s failed: %s\n", path, strerror(errno));
       goto fail;
     }
   }
 
-  info.reserved[1] = 0;
+  if (getenv("MOUSE")) {
+    user_data->mouse = open(getenv("MOUSE"), O_RDONLY);
+    if (user_data->mouse == -1) {
+      printf("open %s failed: %s\n", getenv("MOUSE"), strerror(errno));
+      goto fail;
+    }
+  }
+  else {
+    i = 0;
+    while (1) {
+      sprintf(path, "/dev/input/event%d", i);
+      user_data->mouse = open(path, O_RDONLY);
+      if (user_data->mouse == -1) {
+        sprintf(path, "/dev/input/event1");
+        break;
+      }
+      ioctl(user_data->mouse, EVIOCGNAME(sizeof(name)), name);
+      close(user_data->mouse);
+      if (!strcmp(name, "uinput-mouse")) {
+        break;
+      }
+      i++;
+    }
+    user_data->mouse = open(path, O_RDONLY);
+    if (user_data->mouse == -1) {
+      printf("open %s failed: %s\n", path, strerror(errno));
+      goto fail;
+    }
+  }
 
-  ioctl(fb, FBIOPUT_VSCREENINFO, &info);
+  user_data->window_list.next = &user_data->window_list;
+  user_data->window_list.prev = &user_data->window_list;
+
+  user_data->event_list.next = &user_data->event_list;
+  user_data->event_list.prev = &user_data->event_list;
+
+  ret = pipe(user_data->pipe);
+  if (ret == -1) {
+    printf("pipe failed: %s\n", strerror(errno));
+    goto fail;
+  }
+
+  pthread_create(&user_data->thread, NULL, input_thread, user_data);
 
   *width = info.xres;
   *height = info.yres;
@@ -126,6 +352,18 @@ int init(int *width, int *height, int *err)
   return fb;
 
 fail:
+  if (user_data) {
+    if (user_data->mouse != -1) {
+      close(user_data->mouse);
+    }
+    if (user_data->keyboard != -1) {
+      close(user_data->keyboard);
+    }
+    if (user_data->cursor) {
+      free(user_data->cursor);
+    }
+    free(user_data);
+  }
   if (fb != -1) {
     close(fb);
   }
@@ -133,9 +371,19 @@ fail:
   return 0;
 }
 
-int create_window(int dpy, int width, int height, int opt, int *err)
+int create_window(int dpy, int posx, int posy, int width, int height, int opt, int *err)
 {
+  int fb = dpy;
+  struct fb_var_screeninfo info;
+  struct fb_user_data *user_data = NULL;
   struct fb_window *window = NULL;
+  struct fb_list *window_link = NULL;
+  struct fb_event *event = NULL;
+  struct fb_list *event_link = NULL;
+
+  memset(&info, 0, sizeof(struct fb_var_screeninfo));
+  ioctl(fb, FBIOGET_VSCREENINFO, &info);
+  user_data = (struct fb_user_data *)info.reserved[0];
 
   window = calloc(1, sizeof(struct fb_window));
   if (!window) {
@@ -145,13 +393,42 @@ int create_window(int dpy, int width, int height, int opt, int *err)
   else {
     window->width = width;
     window->height = height;
+    window->posx = posx;
+    window->posy = posy;
   }
+
+  window_link = &window->link;
+  window_link->next = user_data->window_list.next;
+  window_link->prev = &user_data->window_list;
+  user_data->window_list.next->prev = window_link;
+  user_data->window_list.next = window_link;
+
+  event = calloc(1, sizeof(struct fb_event));
+  if (!event) {
+    printf("event calloc failed\n");
+    goto fail;
+  }
+
+  event->type = FB_EVENT_EXPOSE;
+  event->window = window;
+  event_link = &event->link;
+  event_link->next = user_data->event_list.next;
+  event_link->prev = &user_data->event_list;
+  user_data->event_list.next->prev = event_link;
+  user_data->event_list.next = event_link;
 
   *err = 0;
 
   return (int)window;
 
 fail:
+  if (window) {
+    if (window_link) {
+      window_link->next->prev = window_link->prev;
+      window_link->prev->next = window_link->next;
+    }
+    free(window);
+  }
   *err = -1;
   return 0;
 }
@@ -159,7 +436,11 @@ fail:
 void destroy_window(int dpy, int win)
 {
   struct fb_window *window = (struct fb_window *)win;
+  struct fb_list *window_link = NULL;
 
+  window_link = &window->link;
+  window_link->next->prev = window_link->prev;
+  window_link->prev->next = window_link->next;
   free(window);
 }
 
@@ -167,10 +448,26 @@ void fini(int dpy)
 {
   int fb = dpy;
   struct fb_var_screeninfo info;
+  struct fb_user_data *user_data = NULL;
+  struct fb_event *event = NULL;
+  struct fb_list *event_link = NULL;
 
   memset(&info, 0, sizeof(struct fb_var_screeninfo));
   ioctl(fb, FBIOGET_VSCREENINFO, &info);
-  close(info.reserved[0]);
+  user_data = (struct fb_user_data *)info.reserved[0];
+  for (event_link = user_data->event_list.next; event_link != &user_data->event_list; event_link = event_link->next) {
+    event_link->next->prev = event_link->prev;
+    event_link->prev->next = event_link->next;
+    free(event);
+  }
+  write(user_data->pipe[1], "", 1);
+  pthread_join(user_data->thread, NULL);
+  close(user_data->pipe[0]);
+  close(user_data->pipe[1]);
+  close(user_data->mouse);
+  close(user_data->keyboard);
+  free(user_data->cursor);
+  free(user_data);
   close(fb);
 }
 
@@ -215,29 +512,34 @@ static int keymap[] = {
   [ KEY_Z ] = 0x7A,
 };
 
-int get_event(int dpy, int *type, int *key)
+int get_event(int dpy, int *type, int *key, int *x, int *y)
 {
   int fb = dpy;
   struct fb_var_screeninfo info;
-  struct input_event event;
+  struct fb_user_data *user_data = NULL;
+  struct fb_event *event = NULL;
+  struct fb_list *event_link = NULL;
   int win = 0;
 
   *type = EVENT_NONE;
-  *key = 0;
+  *key = *x = *y = 0;
 
   memset(&info, 0, sizeof(struct fb_var_screeninfo));
   ioctl(fb, FBIOGET_VSCREENINFO, &info);
+  user_data = (struct fb_user_data *)info.reserved[0];
 
-  if (!info.reserved[1]) {
-    info.reserved[1] = 1;
-    ioctl(fb, FBIOPUT_VSCREENINFO, &info);
-    *type = EVENT_DISPLAY;
+  event_link = &user_data->event_list;
+  while (event_link->next != &user_data->event_list) {
+    event_link = event_link->next;
   }
-  else {
-    memset(&event, 0, sizeof(struct input_event));
-    read(info.reserved[0], &event, sizeof(struct input_event));
-    if (event.type == EV_KEY && event.value) {
-      switch (event.code) {
+
+  if (event_link != &user_data->event_list) {
+    event = (struct fb_event *)((char *)event_link - (char *)&((struct fb_event *)NULL)->link);
+    if (event->type == FB_EVENT_EXPOSE) {
+      *type = EVENT_DISPLAY;
+    }
+    else if (event->type == FB_EVENT_KEYBOARD) {
+      switch (event->keycode) {
         case KEY_F1:            *key = F1;        break;
         case KEY_F2:            *key = F2;        break;
         case KEY_F3:            *key = F3;        break;
@@ -259,17 +561,25 @@ int get_event(int dpy, int *type, int *key)
         default:                *key = 0;         break;
       }
       if (!*key) {
-        *key = keymap[event.code];
+        *key = keymap[event->keycode];
         *type = EVENT_KEYBOARD;
       }
       else {
         *type = EVENT_SPECIAL;
       }
     }
+    else if (event->type == FB_EVENT_MOUSE) {
+      *x = event->x;
+      *y = event->y;
+      *type = EVENT_PASSIVEMOTION;
+    }
   }
 
   if (*type) {
-    win = 1;
+    win = (int)event->window;
+    event_link->next->prev = event_link->prev;
+    event_link->prev->next = event_link->next;
+    free(event);
   }
 
   return win;

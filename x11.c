@@ -53,12 +53,12 @@ fail:
   return 0;
 }
 
-int create_window(int dpy, int width, int height, int opt, int *err)
+int create_window(int dpy, int posx, int posy, int width, int height, int opt, int *err)
 {
   Display *display = (Display *)dpy;
   Window window = 0;
 
-  window = XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, width, height, 0, 0, 0);
+  window = XCreateSimpleWindow(display, DefaultRootWindow(display), posx, posy, width, height, 0, 0, 0);
   if (!window) {
     printf("XCreateSimpleWindow failed\n");
     goto fail;
@@ -66,7 +66,7 @@ int create_window(int dpy, int width, int height, int opt, int *err)
 
   XMapWindow(display, window);
 
-  XSelectInput(display, window, ExposureMask | KeyPressMask);
+  XSelectInput(display, window, ExposureMask | KeyPressMask | PointerMotionMask);
 
   *err = 0;
 
@@ -92,7 +92,7 @@ void fini(int dpy)
   XCloseDisplay(display);
 }
 
-int get_event(int dpy, int *type, int *key)
+int get_event(int dpy, int *type, int *key, int *x, int *y)
 {
   Display *display = (Display *)dpy;
   XEvent event;
@@ -101,7 +101,7 @@ int get_event(int dpy, int *type, int *key)
   int win = 0;
 
   *type = EVENT_NONE;
-  *key = 0;
+  *key = *x = *y = 0;
 
   if (XPending((Display *)display)) {
     memset(&event, 0, sizeof(XEvent));
@@ -140,10 +140,20 @@ int get_event(int dpy, int *type, int *key)
         *type = EVENT_SPECIAL;
       }
     }
+    else if (event.type == MotionNotify) {
+      *x = event.xmotion.x;
+      *y = event.xmotion.x;
+      *type = EVENT_PASSIVEMOTION;
+    }
   }
 
   if (*type) {
-    win = 1;
+    switch (event.type) {
+      case Expose:       win = event.xexpose.window; break;
+      case KeyPress:     win = event.xkey.window;    break;
+      case MotionNotify: win = event.xmotion.window; break;
+      default:                                       break;
+    }
   }
 
   return win;

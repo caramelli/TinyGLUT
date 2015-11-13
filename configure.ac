@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to create configure.
 
-AC_INIT(TinyGLUT, 0.2)
+AC_INIT(TinyGLUT, 0.3)
 
 AM_INIT_AUTOMAKE
 
@@ -85,7 +85,10 @@ fi
 
 if test x$enable_x11 = xyes; then
   if test x$enable_glx = xyes; then
+    save_LIBS=$LIBS
+    LIBS="$LIBS `$PKG_CONFIG --libs-only-L gl`"
     AC_CHECK_LIB(GL, glXCreateContext, , enable_glx=no)
+    LIBS=$save_LIBS
   fi
   if test x$enable_glx = xno -a x$enable_egl = xno; then
     enable_x11=no
@@ -114,7 +117,10 @@ fi
 
 if test x$enable_fbdev = xyes; then
   if test x$enable_glfbdev = xyes; then
+    save_LIBS=$LIBS
+    LIBS="$LIBS `$PKG_CONFIG --libs-only-L gl`"
     AC_CHECK_LIB(GL, glFBDevCreateContext, , enable_glfbdev=no)
+    LIBS=$save_LIBS
   fi
   if test x$enable_glfbdev = xno -a x$enable_egl = xno; then
     enable_fbdev=no
