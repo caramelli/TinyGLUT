@@ -1,0 +1,14 @@
+Small implementation of GLUT (OpenGL Utility Toolkit)
+-----------------------------------------------------
+
+The TinyGLUT package contains a small implementation of GLUT that supports
+multiple backends:
+  - egl, Embedded-system Graphics Library with x11, directfb, fbdev
+  or dummy platform
+  - glx, OpenGL Extension to X11
+  - dfbgl, OpenGL Extension to DirectFB
+  - glfbdev, OpenGL Extension to Linux FBDev
+
+Have fun,
+
+Nicolas Caramelli

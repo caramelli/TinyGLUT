@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: TinyGLUT
+Description: Small implementation of GLUT (OpenGL Utility Toolkit)
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lglut
+Cflags: -I${includedir}
