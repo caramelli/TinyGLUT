@@ -1,3 +1,15 @@
+commit 7ebe7435ad05df4bbdfbb81c3fad3fd6bc5e0f8a
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Nov 13 21:44:46 2015 +0100
+
+    add Multi Window support
+
+commit 8686a45ebee7df768ccad9eb3fbe1614e37ad4e2
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Nov 13 21:37:47 2015 +0100
+
+    update ChangeLog
+
 commit 55fcc29599ca065c3c476c7036a1d573c4ba4aec
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Fri Nov 13 21:37:02 2015 +0100
