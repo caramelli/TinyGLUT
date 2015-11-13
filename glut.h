@@ -32,6 +32,15 @@
 extern "C" {
 #endif
 
+/* Errors */
+#define GLUT_SUCCESS             0x0000
+#define GLUT_DISPLAY_EXIST       0x0001
+#define GLUT_WINDOW_EXIST        0x0002
+#define GLUT_BAD_BACKEND         0x0003
+#define GLUT_BAD_DISPLAY         0x0004
+#define GLUT_BAD_WINDOW          0x0005
+#define GLUT_BAD_VALUE           0x0006
+
 /* Display mode */
 #define GLUT_DOUBLE              0x0002
 #define GLUT_DEPTH               0x0010
@@ -69,6 +78,7 @@ extern "C" {
 #define GLUT_KEY_PAGE_DOWN       0x0069
 
 /* Functions */
+int glutGetError();
 void glutInit(int *argc, char **argv);
 void glutInitWindowSize(int width, int height);
 void glutInitDisplayMode(unsigned int mode);
@@ -82,6 +92,8 @@ void glutSwapBuffers();
 void glutPostRedisplay();
 int glutGet(int query);
 void glutDestroyWindow(int window);
+void glutExit();
+void glutLeaveMainLoop();
 void glutMainLoop();
 
 #ifdef __cplusplus

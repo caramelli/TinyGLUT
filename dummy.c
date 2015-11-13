@@ -35,8 +35,7 @@ int init(int *width, int *height, int *err)
 {
   if (!getenv("WIDTH") || !getenv("HEIGHT")) {
     printf("WIDTH or HEIGHT is not set\n");
-    *err = -1;
-    return 0;
+    goto fail;
   }
 
   *width = atoi(getenv("WIDTH"));
@@ -44,6 +43,10 @@ int init(int *width, int *height, int *err)
 
   *err = 0;
 
+  return 0;
+
+fail:
+  *err = -1;
   return 0;
 }
 

@@ -33,6 +33,18 @@
 #include <EGL/egl.h>
 #include "attributes.h"
 
+#ifdef FIU_ENABLE
+#include <fiu-local.h>
+#define FIU_CHECK(ptr) \
+  fiu_init(0); \
+  if (fiu_fail("ENOMEM")) { \
+    free(ptr); \
+    ptr = NULL; \
+  }
+#else
+#define FIU_CHECK(ptr)
+#endif
+
 typedef struct {
   EGLNativeDisplayType native_dpy;
   EGLDisplay egl_dpy;
@@ -60,6 +72,7 @@ int Init()
   EGLint egl_glapi = 0;
 
   glut_dpy = calloc(1, sizeof(glutDisplay));
+  FIU_CHECK(glut_dpy);
   if (!glut_dpy) {
     printf("glut_dpy calloc error\n");
     return 0;
@@ -70,7 +83,7 @@ int Init()
     goto error;
   }
   else {
-    sprintf(platform_path, "%s/%s.so", PLATFORMSDIR, getenv("EGL_PLATFORM"));
+    sprintf(platform_path, "%s/%s_plugin.so", PLATFORMSDIR, getenv("EGL_PLATFORM"));
   }
 
   if (!getenv("EGL_GLAPI")) {
@@ -176,6 +189,7 @@ int CreateWindow(int display)
   EGLint i = 0, egl_renderable_type = 0, egl_gles_version = 0;
 
   glut_win = calloc(1, sizeof(glutWindow));
+  FIU_CHECK(glut_win);
   if (!glut_win) {
     printf("glut_win calloc error\n");
     return 0;

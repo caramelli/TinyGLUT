@@ -32,6 +32,18 @@
 #include <GL/glfbdev.h>
 #include "attributes.h"
 
+#ifdef FIU_ENABLE
+#include <fiu-local.h>
+#define FIU_CHECK(ptr) \
+  fiu_init(0); \
+  if (fiu_fail("ENOMEM")) { \
+    free(ptr); \
+    ptr = NULL; \
+  }
+#else
+#define FIU_CHECK(ptr)
+#endif
+
 int init(int *width, int *height, int *err);
 int create_window(int dpy, int width, int height, int opt, int *err);
 void destroy_window(int dpy, int win);
@@ -57,6 +69,7 @@ int Init()
   glutDisplay *glut_dpy = NULL;
 
   glut_dpy = calloc(1, sizeof(glutDisplay));
+  FIU_CHECK(glut_dpy);
   if (!glut_dpy) {
     printf("glut_dpy calloc error\n");
     return 0;
@@ -105,6 +118,7 @@ int CreateWindow(int display)
   int i = 0;
 
   glut_win = calloc(1, sizeof(glutWindow));
+  FIU_CHECK(glut_win);
   if (!glut_win) {
     printf("glut_win calloc error\n");
     return 0;

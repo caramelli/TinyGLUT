@@ -48,21 +48,21 @@ int init(int *width, int *height, int *err)
   int ret = 0;
   int fb = -1;
   struct fb_var_screeninfo info;
+  int i = 0;
+  char name[32], path[32];
 
   if (getenv("FRAMEBUFFER")) {
     fb = open(getenv("FRAMEBUFFER"), O_RDWR);
     if (fb == -1) {
       printf("open %s failed: %s\n", getenv("FRAMEBUFFER"), strerror(errno));
-      *err = -1;
-      return 0;
+      goto fail;
     }
   }
   else {
     fb = open("/dev/fb0", O_RDWR);
     if (fb == -1) {
       printf("open %s failed: %s\n", "/dev/fb0", strerror(errno));
-      *err = -1;
-      return 0;
+      goto fail;
     }
   }
 
@@ -85,17 +85,31 @@ int init(int *width, int *height, int *err)
     goto fail;
   }
 
-  if (getenv("EVDEV")) {
-    info.reserved[0] = open(getenv("EVDEV"), O_RDONLY | O_NONBLOCK);
+  if (getenv("KEYBOARD")) {
+    info.reserved[0] = open(getenv("KEYBOARD"), O_RDONLY | O_NONBLOCK);
     if (info.reserved[0] == -1) {
-      printf("open %s failed: %s\n", getenv("EVDEV"), strerror(errno));
+      printf("open %s failed: %s\n", getenv("KEYBOARD"), strerror(errno));
       goto fail;
     }
   }
   else {
-    info.reserved[0] = open("/dev/input/event0", O_RDONLY | O_NONBLOCK);
+    while (1) {
+      sprintf(path, "/dev/input/event%d", i);
+      info.reserved[0] = open(path, O_RDONLY);
+      if (info.reserved[0] == -1) {
+        sprintf(path, "/dev/input/event0");
+        break;
+      }
+      ioctl(info.reserved[0], EVIOCGNAME(sizeof(name)), name);
+      close(info.reserved[0]);
+      if (!strcmp(name, "uinput")) {
+        break;
+      }
+      i++;
+    }
+    info.reserved[0] = open(path, O_RDONLY | O_NONBLOCK);
     if (info.reserved[0] == -1) {
-      printf("open %s failed: %s\n", "/dev/input/event0", strerror(errno));
+      printf("open %s failed: %s\n", path, strerror(errno));
       goto fail;
     }
   }
@@ -112,7 +126,9 @@ int init(int *width, int *height, int *err)
   return fb;
 
 fail:
-  close(fb);
+  if (fb != -1) {
+    close(fb);
+  }
   *err = -1;
   return 0;
 }
@@ -124,8 +140,7 @@ int create_window(int dpy, int width, int height, int opt, int *err)
   window = calloc(1, sizeof(struct fb_window));
   if (!window) {
     printf("fb_window calloc failed\n");
-    *err = -1;
-    return 0;
+    goto fail;
   }
   else {
     window->width = width;
@@ -135,6 +150,10 @@ int create_window(int dpy, int width, int height, int opt, int *err)
   *err = 0;
 
   return (int)window;
+
+fail:
+  *err = -1;
+  return 0;
 }
 
 void destroy_window(int dpy, int win)

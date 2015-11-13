@@ -38,8 +38,7 @@ int init(int *width, int *height, int *err)
   display = XOpenDisplay(NULL);
   if (!display) {
     printf("XOpenDisplay failed\n");
-    *err = -1;
-    return 0;
+    goto fail;
   }
 
   *width = DisplayWidth(display, 0);
@@ -48,6 +47,10 @@ int init(int *width, int *height, int *err)
   *err = 0;
 
   return (int)display;
+
+fail:
+  *err = -1;
+  return 0;
 }
 
 int create_window(int dpy, int width, int height, int opt, int *err)
@@ -58,8 +61,7 @@ int create_window(int dpy, int width, int height, int opt, int *err)
   window = XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, width, height, 0, 0, 0);
   if (!window) {
     printf("XCreateSimpleWindow failed\n");
-    *err = -1;
-    return 0;
+    goto fail;
   }
 
   XMapWindow(display, window);
@@ -69,6 +71,10 @@ int create_window(int dpy, int width, int height, int opt, int *err)
   *err = 0;
 
   return window;
+
+fail:
+  *err = -1;
+  return 0;
 }
 
 void destroy_window(int dpy, int win)

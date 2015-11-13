@@ -44,20 +44,12 @@ int init(int *width, int *height, int *err)
   ret = DirectFBInit(NULL, NULL);
   if (ret) {
     printf("DirectFBInit failed: %s\n", DirectFBErrorString(ret));
-    *err = -1;
-    return 0;
+    goto fail;
   }
 
   ret = DirectFBCreate(&dfb);
   if (ret) {
     printf("DirectFBCreate failed: %s\n", DirectFBErrorString(ret));
-    *err = -1;
-    return 0;
-  }
-
-  ret = dfb->SetCooperativeLevel(dfb, DFSCL_FULLSCREEN);
-  if (ret) {
-    printf("SetCooperativeLevel failed: %s\n", DirectFBErrorString(ret));
     goto fail;
   }
 
@@ -103,7 +95,9 @@ fail:
     }
     free(private);
   }
-  dfb->Release(dfb);
+  if (dfb) {
+    dfb->Release(dfb);
+  }
   *err = -1;
   return 0;
 }
@@ -123,13 +117,16 @@ int create_window(int dpy, int width, int height, int opt, int *err)
   ret = dfb->CreateSurface(dfb, &desc, &surface);
   if (ret) {
     printf("CreateSurface failed: %s\n", DirectFBErrorString(ret));
-    *err = -1;
-    return 0;
+    goto fail;
   }
 
   *err = 0;
 
   return (int)surface;
+
+fail:
+  *err = -1;
+  return 0;
 }
 
 void destroy_window(int dpy, int win)

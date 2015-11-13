@@ -39,18 +39,18 @@ static void *backend_handle = NULL;
 
 static int t0 = 0;
 
-static int glut_dpy = 0, glut_win = 0;
+static int glut_dpy = 0, glut_win = 0, glut_err = 0, glut_loop = 0;
 
 #define DISPLAY_CHECK() \
   if (!glut_dpy) { \
-    printf("%s exit\n", __FUNCTION__); \
-    exit(1); \
+    printf("%s: display is NULL\n", __FUNCTION__); \
+    glut_err = GLUT_BAD_DISPLAY; \
   }
 
 #define WINDOW_CHECK() \
   if (!glut_win) { \
-    printf("%s exit\n", __FUNCTION__); \
-    exit(1); \
+    printf("%s: window is NULL\n", __FUNCTION__); \
+    glut_err = GLUT_BAD_WINDOW; \
   }
 
 static int (*InitProc)() = NULL;
@@ -70,32 +70,43 @@ static void (*IdleCb)() = NULL;
 static void (*KeyboardCb)(unsigned char, int, int) = NULL;
 static void (*SpecialCb)(int, int, int) = NULL;
 
+int glutGetError()
+{
+  return glut_err;
+}
+
 void glutInit(int *argc, char **argv)
 {
   char backend_path[PATH_MAX];
 
+  glut_err = 0;
+
   if (glut_dpy) {
     printf("display already initialized\n");
+    glut_err = GLUT_DISPLAY_EXIST;
     return;
   }
 
   if (!getenv("GLUT_BACKEND")) {
     printf("GLUT_BACKEND is not set\n");
+    glut_err = GLUT_BAD_BACKEND;
     goto out;
   }
   else {
-    sprintf(backend_path, "%s/%s.so", BACKENDSDIR, getenv("GLUT_BACKEND"));
+    sprintf(backend_path, "%s/%s_plugin.so", BACKENDSDIR, getenv("GLUT_BACKEND"));
   }
 
   backend_handle = dlopen(backend_path, RTLD_LAZY);
   if (!backend_handle) {
     printf("%s backend not found\n", getenv("GLUT_BACKEND"));
+    glut_err = GLUT_BAD_BACKEND;
     goto out;
   }
 
   #define DLSYM(sym) sym##Proc = dlsym(backend_handle, #sym); \
   if (!sym##Proc) { \
     printf("%s not found\n", #sym); \
+    glut_err = GLUT_BAD_BACKEND; \
     goto out; \
   }
 
@@ -112,6 +123,7 @@ void glutInit(int *argc, char **argv)
 
   glut_dpy = InitProc();
   if (!glut_dpy) {
+    glut_err = GLUT_BAD_DISPLAY;
     goto out;
   }
 
@@ -122,12 +134,16 @@ out:
     dlclose(backend_handle);
     backend_handle = NULL;
   }
-  exit(1);
 }
 
 void glutInitWindowSize(int width, int height)
 {
+  glut_err = 0;
+
   DISPLAY_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   InitWindowSizeProc(glut_dpy, width, height);
 }
@@ -136,7 +152,12 @@ void glutInitDisplayMode(unsigned int mode)
 {
   int double_buffer = 0, depth_size = 0;
 
+  glut_err = 0;
+
   DISPLAY_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   if (mode & GLUT_DOUBLE) {
     double_buffer = 1;
@@ -156,66 +177,111 @@ void glutInitDisplayMode(unsigned int mode)
 
 int glutCreateWindow(const char *title)
 {
+  glut_err = 0;
+
   DISPLAY_CHECK();
+  if (glut_err) {
+    return 0;
+  }
 
   if (glut_win) {
     printf("window already created\n");
-    return 0;
+    glut_err = GLUT_WINDOW_EXIST;
+    goto out;
   }
 
   glut_win = CreateWindowProc(glut_dpy);
   if (!glut_win) {
-    exit(1);
+    glut_err = GLUT_BAD_WINDOW;
+    goto out;
   }
 
   return glut_win;
+
+out:
+  return 0;
 }
 
 void glutReshapeFunc(void (*func)(int, int))
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   ReshapeCb = func;
 }
 
 void glutDisplayFunc(void (*func)())
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   DisplayCb = func;
 }
 
 void glutIdleFunc(void (*func)())
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   IdleCb = func;
 }
 
 void glutKeyboardFunc(void (*func)(unsigned char, int, int))
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   KeyboardCb = func;
 }
 
 void glutSpecialFunc(void (*func)(int, int, int))
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   SpecialCb = func;
 }
 
 void glutSwapBuffers()
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   SwapBuffersProc(glut_dpy, glut_win);
 }
 
 void glutPostRedisplay()
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   if (DisplayCb) {
     DisplayCb();
@@ -224,6 +290,8 @@ void glutPostRedisplay()
 
 int glutGet(int query)
 {
+  glut_err = 0;
+
   if (query == GLUT_ELAPSED_TIME) {
     struct timeval tv;
     memset(&tv, 0, sizeof(struct timeval));
@@ -239,6 +307,9 @@ int glutGet(int query)
   }
   else if (query == GLUT_SCREEN_WIDTH || query == GLUT_SCREEN_HEIGHT || query == GLUT_INIT_WINDOW_WIDTH || query == GLUT_INIT_WINDOW_HEIGHT || query == GLUT_INIT_DISPLAY_MODE) {
     DISPLAY_CHECK();
+    if (glut_err) {
+      return 0;
+    }
 
     struct attributes *attribs = GetDisplayAttribsProc(glut_dpy);
     int mode = 0;
@@ -256,6 +327,9 @@ int glutGet(int query)
   }
   else if (query == GLUT_WINDOW_WIDTH || query == GLUT_WINDOW_HEIGHT || query == GLUT_WINDOW_DOUBLEBUFFER || query == GLUT_WINDOW_DEPTH_SIZE) {
     WINDOW_CHECK();
+    if (glut_err) {
+      return 0;
+    }
 
     struct attributes *attribs = GetWindowAttribsProc(glut_win);
 
@@ -266,16 +340,25 @@ int glutGet(int query)
       case GLUT_WINDOW_DEPTH_SIZE: return attribs->depth_size;
     }
   }
+  else {
+    glut_err = GLUT_BAD_VALUE;
+  }
 
   return 0;
 }
 
 void glutDestroyWindow(int window)
 {
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   if (window != glut_win) {
     printf("Bad window\n");
+    glut_err = GLUT_BAD_VALUE;
     return;
   }
 
@@ -284,18 +367,57 @@ void glutDestroyWindow(int window)
   glut_win = 0;
 }
 
+void glutExit()
+{
+  glut_err = 0;
+
+  DISPLAY_CHECK();
+  if (glut_err) {
+    return;
+  }
+
+  if (glut_win) {
+    printf("window is not NULL\n");
+    glut_err = GLUT_WINDOW_EXIST;
+    return;
+  }
+
+  FiniProc(glut_dpy);
+  glut_dpy = 0;
+  t0 = 0;
+  dlclose(backend_handle);
+  backend_handle = NULL;
+}
+
+void glutLeaveMainLoop()
+{
+  WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
+
+  glut_loop = 0;
+}
+
 void glutMainLoop()
 {
   int type = EVENT_NONE, key = 0;
 
+  glut_err = 0;
+
   WINDOW_CHECK();
+  if (glut_err) {
+    return;
+  }
 
   if (ReshapeCb) {
     struct attributes *attribs = GetWindowAttribsProc(glut_win);
     ReshapeCb(attribs->win_width, attribs->win_height);
   }
 
-  while (glut_win) {
+  glut_loop = 1;
+
+  while (glut_loop && glut_win) {
     if (GetEventProc(glut_dpy, &type, &key)) {
       switch (type) {
         case EVENT_DISPLAY:
@@ -324,9 +446,11 @@ void glutMainLoop()
     }
   }
 
-  FiniProc(glut_dpy);
-  glut_dpy = 0;
-  t0 = 0;
-  dlclose(backend_handle);
-  backend_handle = NULL;
+  if (!glut_win) {
+    FiniProc(glut_dpy);
+    glut_dpy = 0;
+    t0 = 0;
+    dlclose(backend_handle);
+    backend_handle = NULL;
+  }
 }
