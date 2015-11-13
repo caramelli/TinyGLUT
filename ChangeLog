@@ -1,3 +1,15 @@
+commit 55fcc29599ca065c3c476c7036a1d573c4ba4aec
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Nov 13 21:37:02 2015 +0100
+
+    add cmake support, add unit testing
+
+commit bf5f3b8eb496fac62e99f2f1e9827094a4795a40
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Nov 13 21:33:06 2015 +0100
+
+    update ChangeLog
+
 commit faffa0c9334fd3e6e3d6647c19b889e89a76a6c7
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Fri Nov 13 21:32:03 2015 +0100
