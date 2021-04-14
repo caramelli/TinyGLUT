@@ -1,6 +1,4 @@
-#####################
-# Platforms plugins #
-#####################
+# Platforms plugins
 
 platformsdir = $(libdir)/glut/platforms
 platforms_LTLIBRARIES =
@@ -42,9 +40,7 @@ wayland_plugin_la_LIBADD = @WAYLAND_LIBS@
 wayland_plugin_la_LDFLAGS = -module -avoid-version
 endif
 
-####################
-# Backends plugins #
-####################
+# Backends plugins
 
 backendsdir = $(libdir)/glut/backends
 backends_LTLIBRARIES =
@@ -84,9 +80,7 @@ glfbdev_plugin_la_DEPENDENCIES = fbdev_plugin.la
 glfbdev_plugin_la_LDFLAGS = -module -avoid-version -Wl,.libs/fbdev_plugin.so -Wl,-rpath,$(libdir)/glut/platforms
 endif
 
-################
-# GLUT library #
-################
+# GLUT library
 
 lib_LTLIBRARIES = libglut.la
 libglut_la_SOURCES = glut.c
@@ -99,10 +93,6 @@ glutinclude_HEADERS = glut.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = glut.pc
-
-##############
-# GLUT tests #
-##############
 
 if TESTS
 TESTS = glut-tests

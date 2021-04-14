@@ -1,25 +1,47 @@
-cmake_minimum_required(VERSION 2.8.11)
+# TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
+# Copyright (c) 2015-2021, Nicolas Caramelli
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set(TINYGLUT_VERSION 0.4)
+cmake_minimum_required(VERSION 3.0)
+project(TinyGLUT VERSION 0.5)
 
 find_package(PkgConfig)
 
 include(CheckIncludeFiles)
+
 include(CheckLibraryExists)
 
 add_definitions(-Wall)
-set(CMAKE_MODULE_LINKER_FLAGS -Wl,--no-undefined)
-set(CMAKE_SHARED_LINKER_FLAGS -Wl,--no-undefined)
 
-###########
-# Options #
-###########
+#########################
+# Configuration options #
+#########################
 
 option(ENABLE_DUMMY "Enable/Disable Dummy platform" ON)
-option(ENABLE_DIRECTFB "Enable/Disable DirectFB platform" ON)
 option(ENABLE_X11 "Enable/Disable X11 platform" ON)
+option(ENABLE_DIRECTFB "Enable/Disable DirectFB platform" ON)
 option(ENABLE_FBDEV "Enable/Disable Linux FBDev platform" ON)
-option(ENABLE_WAYLAND "Enable/Disable Linux FBDev platform" ON)
+option(ENABLE_WAYLAND "Enable/Disable Wayland platform" ON)
 
 option(ENABLE_EGL "Enable/Disable EGL backend" ON)
 option(ENABLE_GLX "Enable/Disable OpenGL Extension to X11 backend" ON)
@@ -47,8 +69,8 @@ if(ENABLE_DIRECTFB)
 endif()
 
 if(ENABLE_FBDEV)
-  CHECK_INCLUDE_FILES(linux/fb.h FB_FOUND)
-  CHECK_INCLUDE_FILES(linux/input.h INPUT_FOUND)
+  check_include_files(linux/fb.h FB_FOUND)
+  check_include_files(linux/input.h INPUT_FOUND)
   if(NOT FB_FOUND OR NOT INPUT_FOUND)
     set(ENABLE_FBDEV OFF)
   endif()
@@ -71,7 +93,9 @@ endif()
 
 if(ENABLE_EGL)
   pkg_check_modules(EGL egl)
-  if(NOT EGL_FOUND)
+  if(EGL_FOUND)
+    list(APPEND EGL_CFLAGS -DEGL_NO_PLATFORM_SPECIFIC_TYPES)
+  else()
     set(ENABLE_EGL OFF)
   endif()
 endif()
@@ -165,24 +189,35 @@ if(ENABLE_TESTS)
   endif()
 endif()
 
-##########
-# Output #
-##########
+#######################
+# Build configuration #
+#######################
 
 message("")
-message("Backends:")
+message("GLUT backends:")
 message("")
-message("  EGL                              " ${ENABLE_EGL})
-message("  OpenGL Extension to X11          " ${ENABLE_GLX})
-message("  OpenGL Extension to DirectFB     " ${ENABLE_DFBGL})
-message("  OpenGL Extension to Linux FBDev  " ${ENABLE_GLFBDEV})
+message("  EGL     (Native Platform Graphics Interface)  " ${ENABLE_EGL})
+if(ENABLE_EGL)
+message("")
+message("           EGL platforms:")
+message("                               X11              " ${ENABLE_X11})
+message("                               DirectFB         " ${ENABLE_DIRECTFB})
+message("                               FBDev            " ${ENABLE_FBDEV})
+message("                               Wayland          " ${ENABLE_WAYLAND})
+message("")
+endif()
+message("  GLX     (OpenGL Extension to X11)             " ${ENABLE_GLX})
+message("  DFBGL   (OpenGL Extension to DirectFB)        " ${ENABLE_DFBGL})
+message("  GLFBDev (OpenGL Extension to FBDev)           " ${ENABLE_GLFBDEV})
 message("")
 message("Tests: " ${ENABLE_TESTS})
 message("")
 
-#####################
-# Platforms plugins #
-#####################
+###############
+# Build rules #
+###############
+
+# Platforms plugins
 
 set(PLATFORMS_DIR ${CMAKE_INSTALL_PREFIX}/lib/glut/platforms)
 
@@ -194,14 +229,14 @@ endif()
 if(ENABLE_X11)
   list(APPEND PLATFORMS_TARGETS x11_plugin)
   add_library(x11_plugin MODULE x11.c)
-  target_include_directories(x11_plugin PRIVATE ${X11_INCLUDE_DIRS})
+  target_compile_options(x11_plugin PRIVATE ${X11_CFLAGS})
   target_link_libraries(x11_plugin ${X11_LDFLAGS})
 endif()
 
 if(ENABLE_DIRECTFB)
   list(APPEND PLATFORMS_TARGETS directfb_plugin)
   add_library(directfb_plugin MODULE directfb.c)
-  target_include_directories(directfb_plugin PRIVATE ${DIRECTFB_INCLUDE_DIRS})
+  target_compile_options(directfb_plugin PRIVATE ${DIRECTFB_CFLAGS})
   target_link_libraries(directfb_plugin ${DIRECTFB_LDFLAGS})
 endif()
 
@@ -214,7 +249,7 @@ endif()
 if(ENABLE_WAYLAND)
   list(APPEND PLATFORMS_TARGETS wayland_plugin)
   add_library(wayland_plugin MODULE wayland.c)
-  target_include_directories(wayland_plugin PRIVATE ${WAYLAND_INCLUDE_DIRS})
+  target_compile_options(wayland_plugin PRIVATE ${WAYLAND_CFLAGS})
   target_link_libraries(wayland_plugin ${WAYLAND_LDFLAGS})
 endif()
 
@@ -222,9 +257,7 @@ set_target_properties(${PLATFORMS_TARGETS} PROPERTIES PREFIX "")
 
 install(TARGETS ${PLATFORMS_TARGETS} DESTINATION ${PLATFORMS_DIR})
 
-####################
-# Backends plugins #
-####################
+# Backends plugins
 
 set(BACKENDS_DIR ${CMAKE_INSTALL_PREFIX}/lib/glut/backends)
 
@@ -232,14 +265,14 @@ if(ENABLE_EGL)
   list(APPEND BACKENDS_TARGETS egl_plugin)
   add_library(egl_plugin MODULE egl.c)
   target_compile_definitions(egl_plugin PRIVATE -DPLATFORMSDIR="${PLATFORMS_DIR}")
-  target_include_directories(egl_plugin PRIVATE ${EGL_INCLUDE_DIRS} ${LIBFIU_INCLUDE_DIRS})
+  target_compile_options(egl_plugin PRIVATE ${EGL_CFLAGS} ${LIBFIU_CFLAGS})
   target_link_libraries(egl_plugin ${EGL_LDFLAGS} ${LIBFIU_LDFLAGS} -ldl)
 endif()
 
 if(ENABLE_GLX)
   list(APPEND BACKENDS_TARGETS glx_plugin)
   add_library(glx_plugin MODULE glx.c)
-  target_include_directories(glx_plugin PRIVATE ${GL_INCLUDE_DIRS} ${LIBFIU_INCLUDE_DIRS})
+  target_compile_options(glx_plugin PRIVATE ${GL_CFLAGS} ${LIBFIU_CFLAGS})
   add_dependencies(glx_plugin x11_plugin)
   target_link_libraries(glx_plugin ${GL_LDFLAGS} ${LIBFIU_LDFLAGS} -Wl,x11_plugin.so -Wl,-rpath,${PLATFORMS_DIR})
 endif()
@@ -247,7 +280,7 @@ endif()
 if(ENABLE_DFBGL)
   list(APPEND BACKENDS_TARGETS dfbgl_plugin)
   add_library(dfbgl_plugin MODULE dfbgl.c)
-  target_include_directories(dfbgl_plugin PRIVATE ${DIRECTFB_INCLUDE_DIRS} ${LIBFIU_INCLUDE_DIRS})
+  target_compile_options(dfbgl_plugin PRIVATE ${DIRECTFB_CFLAGS} ${LIBFIU_CFLAGS})
   add_dependencies(dfbgl_plugin directfb_plugin)
   target_link_libraries(dfbgl_plugin ${LIBFIU_LDFLAGS} -Wl,directfb_plugin.so -Wl,-rpath,${PLATFORMS_DIR})
 endif()
@@ -255,7 +288,7 @@ endif()
 if(ENABLE_GLFBDEV)
   list(APPEND BACKENDS_TARGETS glfbdev_plugin)
   add_library(glfbdev_plugin MODULE glfbdev.c)
-  target_include_directories(glfbdev_plugin PRIVATE ${GL_INCLUDE_DIRS} ${LIBFIU_INCLUDE_DIRS})
+  target_compile_options(glfbdev_plugin PRIVATE ${GL_CFLAGS} ${LIBFIU_CFLAGS})
   add_dependencies(glfbdev_plugin fbdev_plugin)
   target_link_libraries(glfbdev_plugin ${GL_LDFLAGS} ${LIBFIU_LDFLAGS} -Wl,fbdev_plugin.so -Wl,-rpath,${PLATFORMS_DIR})
 endif()
@@ -264,13 +297,11 @@ set_target_properties(${BACKENDS_TARGETS} PROPERTIES PREFIX "")
 
 install(TARGETS ${BACKENDS_TARGETS} DESTINATION ${BACKENDS_DIR})
 
-################
-# GLUT library #
-################
+# GLUT library
 
 add_library(glut SHARED glut.c)
 target_compile_definitions(glut PRIVATE -DBACKENDSDIR="${BACKENDS_DIR}")
-target_include_directories(glut PRIVATE ${LIBFIU_INCLUDE_DIRS})
+target_compile_options(glut PRIVATE ${LIBFIU_CFLAGS})
 target_link_libraries(glut ${LIBFIU_LDFLAGS} -ldl)
 set_target_properties(glut PROPERTIES VERSION 3.0.0 SOVERSION 3)
 
@@ -281,18 +312,14 @@ set(prefix ${CMAKE_INSTALL_PREFIX})
 set(exec_prefix \${prefix})
 set(libdir \${exec_prefix}/lib)
 set(includedir \${prefix}/include)
-set(PACKAGE_VERSION ${TINYGLUT_VERSION})
+set(PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
 configure_file(glut.pc.in glut.pc @ONLY)
 install(FILES glut.pc DESTINATION lib/pkgconfig)
-
-##############
-# GLUT tests #
-##############
 
 if(ENABLE_TESTS)
   add_definitions(-DFIU_ENABLE)
   add_executable(glut-tests glut-tests.c)
-  target_include_directories(glut-tests PRIVATE ${CHECK_INCLUDE_DIRS} ${LIBFIU_INCLUDE_DIRS})
+  target_compile_options(glut-tests PRIVATE ${CHECK_CFLAGS} ${LIBFIU_CFLAGS})
   target_link_libraries(glut-tests glut ${CHECK_LDFLAGS} ${LIBFIU_LDFLAGS})
   enable_testing()
   add_test(glut-tests glut-tests)

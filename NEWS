@@ -1,3 +1,7 @@
+0.5
+---
+Support for creating an OpenGL ES context instead of an OpenGL one
+
 0.4
 ---
 Wayland support

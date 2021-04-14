@@ -1,6 +1,30 @@
-dnl Process this file with autoconf to create configure.
+# TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
+# Copyright (c) 2015-2021, Nicolas Caramelli
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-AC_INIT(TinyGLUT, 0.4)
+AC_INIT(TinyGLUT, 0.5)
+
+AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE
 
@@ -13,11 +37,10 @@ AM_PROG_CC_C_O
 PKG_PROG_PKG_CONFIG
 
 CFLAGS="$CFLAGS -Wall"
-LDFLAGS="$LDFLAGS -Wl,--no-undefined"
 
-dnl
-dnl Options
-dnl
+#########################
+# Configuration options #
+#########################
 
 AC_ARG_ENABLE(dummy,
               AS_HELP_STRING(--disable-dummy, disable Dummy platform),
@@ -53,9 +76,9 @@ AC_ARG_ENABLE(tests,
               AS_HELP_STRING(--disable-tests, disable unit testing),
               enable_tests=no, enable_tests=yes)
 
-dnl
-dnl Platforms
-dnl
+#############
+# Platforms #
+#############
 
 if test x$enable_x11 = xyes; then
   PKG_CHECK_MODULES(X11, x11, , enable_x11=no)
@@ -77,12 +100,15 @@ if test x$enable_dummy = xno -a x$enable_x11 = xno -a x$enable_directfb = xno -a
   AC_MSG_ERROR(No platforms found)
 fi
 
-dnl
-dnl Backends
-dnl
+############
+# Backends #
+############
 
 if test x$enable_egl = xyes; then
   PKG_CHECK_MODULES(EGL, egl, , enable_egl=no)
+  if test x$enable_egl = xyes; then
+    EGL_CFLAGS="$EGL_CFLAGS -DEGL_NO_PLATFORM_SPECIFIC_TYPES"
+  fi
 fi
 
 if test x$enable_dummy = xyes; then
@@ -137,6 +163,12 @@ else
   enable_glfbdev=no
 fi
 
+if test x$enable_wayland = xyes; then
+  if test x$enable_egl = xno; then
+    enable_wayland=no
+  fi
+fi
+
 if test x$enable_glx = xyes || test x$enable_glfbdev = xyes; then
   PKG_CHECK_MODULES(GL, gl, , enable_glx=no enable_glfbdev=no)
 fi
@@ -145,9 +177,9 @@ if test x$enable_egl = xno -a x$enable_glx = xno -a x$enable_dfbgl = xno -a x$en
   AC_MSG_ERROR(No backends found)
 fi
 
-dnl
-dnl Tests
-dnl
+#########
+# Tests #
+#########
 
 if test x$enable_tests = xyes; then
   PKG_CHECK_MODULES(CHECK, check, , enable_tests=no)
@@ -157,9 +189,35 @@ if test x$enable_tests = xyes; then
   fi
 fi
 
-dnl
-dnl Output
-dnl
+#######################
+# Build configuration #
+#######################
+
+echo
+echo "GLUT backends:"
+echo
+echo "  EGL     (Native Platform Graphics Interface)  $enable_egl"
+if test x$enable_egl = xyes; then
+echo
+echo "           EGL platforms:"
+echo "                               X11              $enable_x11"
+echo "                               DirectFB         $enable_directfb"
+echo "                               FBDev            $enable_fbdev"
+echo "                               Wayland          $enable_wayland"
+echo
+fi
+echo "  GLX     (OpenGL Extension to X11)             $enable_glx"
+echo "  DFBGL   (OpenGL Extension to DirectFB)        $enable_dfbgl"
+echo "  GLFBDev (OpenGL Extension to FBDev)           $enable_glfbdev"
+echo
+echo "Tests: $enable_tests"
+echo
+
+###############
+# Build rules #
+###############
+
+# Platforms plugins
 
 AM_CONDITIONAL(DUMMY, test x$enable_dummy = xyes)
 AM_CONDITIONAL(X11, test x$enable_x11 = xyes)
@@ -167,22 +225,17 @@ AM_CONDITIONAL(DIRECTFB, test x$enable_directfb = xyes)
 AM_CONDITIONAL(FBDEV, test x$enable_fbdev = xyes)
 AM_CONDITIONAL(WAYLAND, test x$enable_wayland = xyes)
 
+# Backends plugins
+
 AM_CONDITIONAL(EGL, test x$enable_egl = xyes)
 AM_CONDITIONAL(GLX, test x$enable_glx = xyes)
 AM_CONDITIONAL(DFBGL, test x$enable_dfbgl = xyes)
 AM_CONDITIONAL(GLFBDEV, test x$enable_glfbdev = xyes)
 
+# GLUT library
+
 AM_CONDITIONAL(TESTS, test x$enable_tests = xyes)
 
-AC_OUTPUT(Makefile glut.pc)
+AC_CONFIG_FILES(Makefile glut.pc)
 
-echo
-echo "Backends:"
-echo
-echo "  EGL                              $enable_egl"
-echo "  OpenGL Extension to X11          $enable_glx"
-echo "  OpenGL Extension to DirectFB     $enable_dfbgl"
-echo "  OpenGL Extension to Linux FBDev  $enable_glfbdev"
-echo
-echo "Tests: $enable_tests"
-echo
+AC_OUTPUT

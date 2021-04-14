@@ -1,30 +1,30 @@
 /*
-  TinyGLUT            Small implementation of GLUT (OpenGL Utility Toolkit)
-
-  Copyright (C) 2015  Nicolas Caramelli
-  All rights reserved.
-
+  TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
+  Copyright (c) 2015-2021, Nicolas Caramelli
+  
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
-
-     1. Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-     2. Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS "AS IS" AND
-  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
-  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  
+  1. Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+  
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <dirent.h>
 #include <dlfcn.h>
 #include <limits.h>
 #include <stdio.h>
@@ -102,6 +102,7 @@ static int (*InitProc)() = NULL;
 static void (*InitWindowPositionProc)(int, int, int) = NULL;
 static void (*InitWindowSizeProc)(int, int, int) = NULL;
 static void (*InitDisplayModeProc)(int, int, int) = NULL;
+static void (*InitContextProfileProc)(int, int) = NULL;
 static int (*CreateWindowProc)(int) = NULL;
 static void (*SetWindowProc)(int, int, int) = NULL;
 static void (*SwapBuffersProc)(int, int) = NULL;
@@ -131,9 +132,23 @@ void glutInit(int *argc, char **argv)
   }
 
   if (!getenv("GLUT_BACKEND")) {
-    printf("GLUT_BACKEND is not set\n");
-    glut_err = GLUT_BAD_BACKEND;
-    goto out;
+    DIR *dir;
+    struct dirent *backend;
+
+    dir = opendir(BACKENDSDIR);
+    if (!dir) {
+      glut_err = GLUT_BAD_BACKEND;
+      goto out;
+    }
+
+    while ((backend = readdir(dir))) {
+      if (backend->d_type == DT_REG && strstr(backend->d_name, ".so")) {
+        sprintf(backend_path, "%s/%s", BACKENDSDIR, backend->d_name);
+        break;
+      }
+    }
+
+    closedir(dir);
   }
   else {
     sprintf(backend_path, "%s/%s_plugin.so", BACKENDSDIR, getenv("GLUT_BACKEND"));
@@ -157,6 +172,7 @@ void glutInit(int *argc, char **argv)
   DLSYM(InitWindowPosition);
   DLSYM(InitWindowSize);
   DLSYM(InitDisplayMode);
+  DLSYM(InitContextProfile);
   DLSYM(CreateWindow);
   DLSYM(SetWindow);
   DLSYM(SwapBuffers);
@@ -230,6 +246,18 @@ void glutInitDisplayMode(unsigned int mode)
   }
 
   InitDisplayModeProc(glut_dpy, double_buffer, depth_size);
+}
+
+void glutInitContextProfile(int profile)
+{
+  glut_err = 0;
+
+  DISPLAY_CHECK();
+  if (glut_err) {
+    return;
+  }
+
+  InitContextProfileProc(glut_dpy, profile == GLUT_ES_PROFILE ? 1 : 0);
 }
 
 int glutCreateWindow(const char *title)
@@ -594,7 +622,7 @@ void glutMainLoop()
     if (native_win) {
       for (glut_win_entry = glut_win_list.next; glut_win_entry != &glut_win_list; glut_win_entry = glut_win_entry->next) {
         glut_win_ctx = (glutWindowContext *)glut_win_entry;
-        if (*(int *)glut_win_ctx->win == native_win)
+        if (*(int *)(long)glut_win_ctx->win == native_win)
           break;
       }
       switch (type) {

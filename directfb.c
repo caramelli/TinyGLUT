@@ -1,28 +1,27 @@
 /*
-  TinyGLUT            Small implementation of GLUT (OpenGL Utility Toolkit)
-
-  Copyright (C) 2015  Nicolas Caramelli
-  All rights reserved.
-
+  TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
+  Copyright (c) 2015-2021, Nicolas Caramelli
+  
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
-
-     1. Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-     2. Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS "AS IS" AND
-  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
-  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  
+  1. Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+  
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <directfb.h>
@@ -64,7 +63,7 @@ int init(int *width, int *height, int *err)
     goto fail;
   }
 
-  dfb->refs = (int)private;
+  dfb->refs = (long)private;
 
   ret = dfb->CreateEventBuffer(dfb, &private->event_buffer);
   if (ret) {
@@ -90,7 +89,7 @@ int init(int *width, int *height, int *err)
 
   *err = 0;
 
-  return (int)dfb;
+  return (long)dfb;
 
 fail:
   if (private) {
@@ -109,14 +108,12 @@ fail:
 int create_window(int dpy, int posx, int posy, int width, int height, int opt, int *err)
 {
   int ret = 0;
-  IDirectFB *dfb = (IDirectFB *)dpy;
-  DFBPrivate *private = NULL;
+  IDirectFB *dfb = (IDirectFB *)(long)dpy;
+  DFBPrivate *private = (DFBPrivate *)(long)dfb->refs;
   DFBWindowDescription desc;
   IDirectFBWindow *window = NULL;
   IDirectFBSurface *surface = NULL;
   DFBWindowProperty *property = NULL;
-
-  private = (DFBPrivate *)dfb->refs;
 
   memset(&desc, 0, sizeof(DFBWindowDescription));
   desc.flags = DWDESC_SURFACE_CAPS | DWDESC_WIDTH | DWDESC_HEIGHT | DWDESC_POSX | DWDESC_POSY;
@@ -177,7 +174,7 @@ int create_window(int dpy, int posx, int posy, int width, int height, int opt, i
 
   *err = 0;
 
-  return (int)surface;
+  return (long)surface;
 
 fail:
   if (property) {
@@ -195,17 +192,16 @@ fail:
 
 void destroy_window(int dpy, int win)
 {
-  IDirectFBSurface *surface = (IDirectFBSurface *)win;
+  IDirectFBSurface *surface = (IDirectFBSurface *)(long)win;
 
   surface->Release(surface);
 }
 
 void fini(int dpy)
 {
-  IDirectFB *dfb = (IDirectFB *)dpy;
-  DFBPrivate *private = NULL;
+  IDirectFB *dfb = (IDirectFB *)(long)dpy;
+  DFBPrivate *private = (DFBPrivate *)(long)dfb->refs;
 
-  private = (DFBPrivate *)dfb->refs;
   private->layer->Release(private->layer);
   private->event_buffer->Release(private->event_buffer);
   free(private);
@@ -214,14 +210,12 @@ void fini(int dpy)
 
 int get_event(int dpy, int *type, int *key, int *x, int *y)
 {
-  IDirectFB *dfb = (IDirectFB *)dpy;
-  DFBPrivate *private = NULL;
+  IDirectFB *dfb = (IDirectFB *)(long)dpy;
+  DFBPrivate *private = (DFBPrivate *)(long)dfb->refs;
   IDirectFBWindow *window = NULL;
   DFBWindowEvent event;
   DFBWindowProperty *property = NULL;
   int win = 0;
-
-  private = (DFBPrivate *)dfb->refs;
 
   *type = EVENT_NONE;
   *key = *x = *y = 0;
@@ -275,7 +269,7 @@ int get_event(int dpy, int *type, int *key, int *x, int *y)
   }
 
   if (*type) {
-    win = (int)property->surface;
+    win = (long)property->surface;
   }
 
   return win;

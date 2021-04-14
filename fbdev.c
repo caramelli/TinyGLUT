@@ -1,28 +1,27 @@
 /*
-  TinyGLUT            Small implementation of GLUT (OpenGL Utility Toolkit)
-
-  Copyright (C) 2015  Nicolas Caramelli
-  All rights reserved.
-
+  TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
+  Copyright (c) 2015-2021, Nicolas Caramelli
+  
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
-
-     1. Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-     2. Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS "AS IS" AND
-  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
-  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  
+  1. Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+  
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <errno.h>
@@ -234,7 +233,7 @@ int init(int *width, int *height, int *err)
     goto fail;
   }
 
-  info.reserved[0] = (int)user_data;
+  info.reserved[0] = (long)user_data;
   ret = ioctl(fb, FBIOPUT_VSCREENINFO, &info);
   if (ret == -1) {
     printf("ioctl FBIOPUT_VSCREENINFO failed: %s\n", strerror(errno));
@@ -383,7 +382,7 @@ int create_window(int dpy, int posx, int posy, int width, int height, int opt, i
 
   memset(&info, 0, sizeof(struct fb_var_screeninfo));
   ioctl(fb, FBIOGET_VSCREENINFO, &info);
-  user_data = (struct fb_user_data *)info.reserved[0];
+  user_data = (struct fb_user_data *)(long)info.reserved[0];
 
   window = calloc(1, sizeof(struct fb_window));
   if (!window) {
@@ -419,7 +418,7 @@ int create_window(int dpy, int posx, int posy, int width, int height, int opt, i
 
   *err = 0;
 
-  return (int)window;
+  return (long)window;
 
 fail:
   if (window) {
@@ -435,7 +434,7 @@ fail:
 
 void destroy_window(int dpy, int win)
 {
-  struct fb_window *window = (struct fb_window *)win;
+  struct fb_window *window = (struct fb_window *)(long)win;
   struct fb_list *window_link = NULL;
 
   window_link = &window->link;
@@ -454,7 +453,7 @@ void fini(int dpy)
 
   memset(&info, 0, sizeof(struct fb_var_screeninfo));
   ioctl(fb, FBIOGET_VSCREENINFO, &info);
-  user_data = (struct fb_user_data *)info.reserved[0];
+  user_data = (struct fb_user_data *)(long)info.reserved[0];
   for (event_link = user_data->event_list.next; event_link != &user_data->event_list; event_link = event_link->next) {
     event_link->next->prev = event_link->prev;
     event_link->prev->next = event_link->next;
@@ -526,7 +525,7 @@ int get_event(int dpy, int *type, int *key, int *x, int *y)
 
   memset(&info, 0, sizeof(struct fb_var_screeninfo));
   ioctl(fb, FBIOGET_VSCREENINFO, &info);
-  user_data = (struct fb_user_data *)info.reserved[0];
+  user_data = (struct fb_user_data *)(long)info.reserved[0];
 
   event_link = &user_data->event_list;
   while (event_link->next != &user_data->event_list) {
@@ -576,7 +575,7 @@ int get_event(int dpy, int *type, int *key, int *x, int *y)
   }
 
   if (*type) {
-    win = (int)event->window;
+    win = (long)event->window;
     event_link->next->prev = event_link->prev;
     event_link->prev->next = event_link->next;
     free(event);

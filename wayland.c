@@ -1,28 +1,27 @@
 /*
-  TinyGLUT            Small implementation of GLUT (OpenGL Utility Toolkit)
-
-  Copyright (C) 2015  Nicolas Caramelli
-  All rights reserved.
-
+  TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
+  Copyright (c) 2015-2021, Nicolas Caramelli
+  
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
-
-     1. Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-     2. Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS "AS IS" AND
-  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
-  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  
+  1. Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+  
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <stdlib.h>
@@ -35,13 +34,17 @@
 #include "keys.h"
 
 struct wl_window {
-  struct wl_surface *surface;
+  long version;
   int width;
   int height;
   int dx;
   int dy;
   int attached_width;
   int attached_height;
+  void *private;
+  void (*resize_callback)(struct wl_window *, void *);
+  void (*destroy_window_callback)(void *);
+  struct wl_surface *surface;
   struct wl_shell_surface *shell_surface;
 };
 
@@ -321,7 +324,7 @@ int init(int *width, int *height, int *err)
 
   *err = 0;
 
-  return (int)display;
+  return (long)display;
 
 fail:
   if (user_data) {
@@ -337,29 +340,9 @@ fail:
   return 0;
 }
 
-static void wl_shell_surface_handle_ping(void *data, struct wl_shell_surface *shell_surface, unsigned int serial)
-{
-  wl_shell_surface_pong(shell_surface, serial);
-}
-
-static void wl_shell_surface_handle_configure(void *data, struct wl_shell_surface *shell_surface, unsigned int edges, int width, int height)
-{
-}
-
-static void wl_shell_surface_handle_popup_done(void *data, struct wl_shell_surface *shell_surface)
-{
-}
-
-static struct wl_shell_surface_listener wl_shell_surface_listener = {
-  wl_shell_surface_handle_ping,
-  wl_shell_surface_handle_configure,
-  wl_shell_surface_handle_popup_done
-};
-
 int create_window(int dpy, int posx, int posy, int width, int height, int opt, int *err)
 {
-  int ret = 0;
-  struct wl_display *display = (struct wl_display *)dpy;
+  struct wl_display *display = (struct wl_display *)(long)dpy;
   struct wl_user_data *user_data = NULL;
   struct wl_window *window = NULL;
   struct wl_event *event = NULL;
@@ -391,15 +374,9 @@ int create_window(int dpy, int posx, int posy, int width, int height, int opt, i
     goto fail;
   }
 
-  ret = wl_shell_surface_add_listener(window->shell_surface, &wl_shell_surface_listener, NULL);
-  if (ret == -1) {
-    printf("wl_shell_surface_add_listener failed\n");
-    goto fail;
-  }
+  wl_shell_surface_set_toplevel(window->shell_surface);
 
   wl_shell_surface_set_position(window->shell_surface, posx, posy);
-
-  wl_shell_surface_set_toplevel(window->shell_surface);
 
   event = calloc(1, sizeof(struct wl_event));
   if (!event) {
@@ -413,7 +390,7 @@ int create_window(int dpy, int posx, int posy, int width, int height, int opt, i
 
   *err = 0;
 
-  return (int)window;
+  return (long)window;
 
 fail:
   if (window) {
@@ -431,7 +408,7 @@ fail:
 
 void destroy_window(int dpy, int win)
 {
-  struct wl_window *window = (struct wl_window *)win;
+  struct wl_window *window = (struct wl_window *)(long)win;
 
   wl_shell_surface_destroy(window->shell_surface);
   wl_surface_destroy(window->surface);
@@ -440,7 +417,7 @@ void destroy_window(int dpy, int win)
 
 void fini(int dpy)
 {
-  struct wl_display *display = (struct wl_display *)dpy;
+  struct wl_display *display = (struct wl_display *)(long)dpy;
   struct wl_user_data *user_data = NULL;
   struct wl_event *event = NULL;
 
@@ -465,7 +442,7 @@ void fini(int dpy)
 
 int get_event(int dpy, int *type, int *key, int *x, int *y)
 {
-  struct wl_display *display = (struct wl_display *)dpy;
+  struct wl_display *display = (struct wl_display *)(long)dpy;
   struct wl_user_data *user_data = NULL;
   struct wl_event *event = NULL;
   struct wl_list *event_link = NULL;
@@ -528,7 +505,7 @@ int get_event(int dpy, int *type, int *key, int *x, int *y)
   }
 
   if (*type) {
-    win = (int)event->window;
+    win = (long)event->window;
     wl_list_remove(&event->link);
     free(event);
   }

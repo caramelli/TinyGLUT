@@ -1,34 +1,35 @@
 /*
-  TinyGLUT            Small implementation of GLUT (OpenGL Utility Toolkit)
-
-  Copyright (C) 2015  Nicolas Caramelli
-  All rights reserved.
-
+  TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
+  Copyright (c) 2015-2021, Nicolas Caramelli
+  
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
-
-     1. Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-     2. Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS "AS IS" AND
-  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
-  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  
+  1. Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+  
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <GL/glfbdev.h>
 #include "attributes.h"
 
@@ -83,7 +84,7 @@ int Init()
   glut_dpy->attribs.win_width = glut_dpy->attribs.dpy_width;
   glut_dpy->attribs.win_height = glut_dpy->attribs.dpy_height;
 
-  return (int)glut_dpy;
+  return (long)glut_dpy;
 
 error:
   free(glut_dpy);
@@ -92,7 +93,7 @@ error:
 
 void InitWindowPosition(int display, int posx, int posy)
 {
-  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
 
   glut_dpy->attribs.win_posx = posx;
   glut_dpy->attribs.win_posy = posy;
@@ -100,7 +101,7 @@ void InitWindowPosition(int display, int posx, int posy)
 
 void InitWindowSize(int display, int width, int height)
 {
-  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
 
   glut_dpy->attribs.win_width = width;
   glut_dpy->attribs.win_height = height;
@@ -108,16 +109,25 @@ void InitWindowSize(int display, int width, int height)
 
 void InitDisplayMode(int display, int double_buffer, int depth_size)
 {
-  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
 
   glut_dpy->attribs.double_buffer = double_buffer;
   glut_dpy->attribs.depth_size = depth_size;
 }
 
+void InitContextProfile(int display, int profile)
+{
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
+
+  if (profile) {
+    glut_dpy->attribs.gles_version = 2;
+  }
+}
+
 int CreateWindow(int display)
 {
   int err = 0;
-  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
   glutWindow *glut_win = NULL;
   GLFBDevVisualPtr glfbdev_visual = NULL;
   struct fb_fix_screeninfo fbdev_finfo;
@@ -180,7 +190,7 @@ int CreateWindow(int display)
     goto error;
   }
 
-  glFBDevSetWindow(glut_win->glfbdev_buffer, (void *)glut_win->fbdev_win);
+  glFBDevSetWindow(glut_win->glfbdev_buffer, (void *)(long)glut_win->fbdev_win);
 
   glut_win->glfbdev_ctx = glFBDevCreateContext(glfbdev_visual, NULL);
   if (!glut_win->glfbdev_ctx) {
@@ -198,7 +208,7 @@ int CreateWindow(int display)
 
   glFBDevDestroyVisual(glfbdev_visual);
 
-  return (int)glut_win;
+  return (long)glut_win;
 
 error:
   if (glut_win->glfbdev_ctx) {
@@ -223,7 +233,7 @@ error:
 void SetWindow(int display, int window, int context)
 {
   int err = 0;
-  glutWindow *glut_win = (glutWindow *)window;
+  glutWindow *glut_win = (glutWindow *)(long)window;
 
   if (context) {
     err = glFBDevMakeCurrent(glut_win->glfbdev_ctx, glut_win->glfbdev_buffer, glut_win->glfbdev_buffer);
@@ -238,29 +248,29 @@ void SetWindow(int display, int window, int context)
 
 void SwapBuffers(int display, int window)
 {
-  glutWindow *glut_win = (glutWindow *)window;
+  glutWindow *glut_win = (glutWindow *)(long)window;
 
   glFBDevSwapBuffers(glut_win->glfbdev_buffer);
 }
 
 struct attributes *GetDisplayAttribs(int display)
 {
-  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
 
   return &glut_dpy->attribs;
 }
 
 struct attributes *GetWindowAttribs(int window)
 {
-  glutWindow *glut_win = (glutWindow *)window;
+  glutWindow *glut_win = (glutWindow *)(long)window;
 
   return &glut_win->attribs;
 }
 
 void DestroyWindow(int display, int window)
 {
-  glutDisplay *glut_dpy = (glutDisplay *)display;
-  glutWindow *glut_win = (glutWindow *)window;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
+  glutWindow *glut_win = (glutWindow *)(long)window;
   struct fb_fix_screeninfo fbdev_finfo;
 
   glFBDevDestroyContext(glut_win->glfbdev_ctx);
@@ -277,7 +287,7 @@ void DestroyWindow(int display, int window)
 
 void Fini(int display)
 {
-  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
 
   fini(glut_dpy->fbdev_dpy);
 
@@ -286,7 +296,7 @@ void Fini(int display)
 
 int GetEvent(int display, int *type, int *key, int *x, int *y)
 {
-  glutDisplay *glut_dpy = (glutDisplay *)display;
+  glutDisplay *glut_dpy = (glutDisplay *)(long)display;
 
   return get_event(glut_dpy->fbdev_dpy, type, key, x, y);
 }
