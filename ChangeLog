@@ -1,3 +1,15 @@
+commit 38899eb9bc221a5ff229d02baaea706019bce16f
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Wed Apr 14 10:26:32 2021 +0200
+
+    add support for creating an OpenGL ES context instead of an OpenGL one
+
+commit ead1097b34a7d8e490a353909b44a5967388e317
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Nov 13 21:50:46 2015 +0100
+
+    update ChangeLog
+
 commit 35599c09303898839a594ac055456ee83b3440ed
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Fri Nov 13 21:50:29 2015 +0100
