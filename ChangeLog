@@ -1,3 +1,15 @@
+commit 41ab3c43e42c812473eccce0bf8da803710cdae8
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Sat Aug 24 07:35:32 2024 +0200
+
+    add meson support
+
+commit 8fdf666caef8eab048a4b9defe4ab80196413e6c
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Sat Aug 10 22:08:06 2024 +0200
+
+    update ChangeLog
+
 commit 38899eb9bc221a5ff229d02baaea706019bce16f
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Wed Apr 14 10:26:32 2021 +0200
