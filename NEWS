@@ -1,3 +1,7 @@
+0.6
+---
+Meson build system
+
 0.5
 ---
 Support for creating an OpenGL ES context instead of an OpenGL one
@@ -12,8 +16,8 @@ Multi Window support
 
 0.2
 ---
-CMake support, unit testing
+CMake build system, unit testing
 
 0.1
 ---
-Initial release
+Initial release with Autotools build system

@@ -1,6 +1,6 @@
 /*
   TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
-  Copyright (c) 2015-2021, Nicolas Caramelli
+  Copyright (c) 2015-2024, Nicolas Caramelli
   
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
@@ -44,33 +44,39 @@ static void sighandler_quit(int signum)
 static void sighandler_input(int signum)
 {
   struct input_event event;
+
   memset(&event, 0, sizeof(struct input_event));
 
   event.type = EV_REL;
   event.code = REL_X;
   event.value = 1;
   write(uinput_mouse, &event, sizeof(struct input_event));
-  sleep(1);
   event.code = REL_Y;
   event.value = 1;
   write(uinput_mouse, &event, sizeof(struct input_event));
-  sleep(1);
+  event.type = EV_SYN;
+  event.code = SYN_REPORT;
+  write(uinput_mouse, &event, sizeof(struct input_event));
 
   event.type = EV_KEY;
   event.code = KEY_F1;
   event.value = 1;
   write(uinput_keyboard, &event, sizeof(struct input_event));
-  sleep(1);
   event.value = 0;
   write(uinput_keyboard, &event, sizeof(struct input_event));
-  sleep(1);
+  event.type = EV_SYN;
+  event.code = SYN_REPORT;
+  write(uinput_keyboard, &event, sizeof(struct input_event));
+
+  event.type = EV_KEY;
   event.code = KEY_ESC;
   event.value = 1;
   write(uinput_keyboard, &event, sizeof(struct input_event));
-  sleep(1);
   event.value = 0;
   write(uinput_keyboard, &event, sizeof(struct input_event));
-  sleep(1);
+  event.type = EV_SYN;
+  event.code = SYN_REPORT;
+  write(uinput_keyboard, &event, sizeof(struct input_event));
 }
 
 static void glutReshape(int width, int height)
@@ -117,14 +123,10 @@ START_TEST(test_glutInit)
   ck_assert_int_eq(glutGetError(), GLUT_DISPLAY_EXIST);
   glutExit();
 
-  char *backend = getenv("GLUT_BACKEND");
-  unsetenv("GLUT_BACKEND");
-  glutInit(NULL, NULL);
-  ck_assert_int_eq(glutGetError(), GLUT_BAD_BACKEND);
   setenv("GLUT_BACKEND", "none", 1);
   glutInit(NULL, NULL);
   ck_assert_int_eq(glutGetError(), GLUT_BAD_BACKEND);
-  setenv("GLUT_BACKEND", backend, 1);
+  unsetenv("GLUT_BACKEND");
 
   fiu_enable("BACKEND_ENOMEM", 1, NULL, FIU_ONETIME);
   glutInit(NULL, NULL);
@@ -548,6 +550,9 @@ END_TEST
 
 START_TEST(test_glutMainLoop)
 {
+  struct uinput_user_dev dev;
+  int i;
+
   glutMainLoop();
   ck_assert_int_eq(glutGetError(), GLUT_BAD_WINDOW);
 
@@ -560,12 +565,14 @@ START_TEST(test_glutMainLoop)
   glutDestroyWindow(glut_win);
   glutExit();
 
-  struct uinput_user_dev dev;
   memset(&dev, 0, sizeof(struct uinput_user_dev));
   uinput_keyboard = open("/dev/uinput", O_WRONLY);
   strcpy(dev.name, "uinput-keyboard");
   write(uinput_keyboard, &dev, sizeof(struct uinput_user_dev));
   ioctl(uinput_keyboard, UI_SET_EVBIT, EV_KEY);
+  for (i = KEY_Q; i <= KEY_M; i++) {
+    ioctl(uinput_keyboard, UI_SET_KEYBIT, i);
+  }
   ioctl(uinput_keyboard, UI_SET_KEYBIT, KEY_ESC);
   ioctl(uinput_keyboard, UI_SET_KEYBIT, KEY_F1);
   ioctl(uinput_keyboard, UI_DEV_CREATE);

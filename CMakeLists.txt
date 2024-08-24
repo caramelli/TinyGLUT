@@ -1,5 +1,5 @@
 # TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
-# Copyright (c) 2015-2021, Nicolas Caramelli
+# Copyright (c) 2015-2024, Nicolas Caramelli
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -23,32 +23,31 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required(VERSION 3.0)
-project(TinyGLUT VERSION 0.5)
-
-find_package(PkgConfig)
+project(TinyGLUT VERSION 0.6)
 
 include(CheckIncludeFiles)
-
 include(CheckLibraryExists)
-
+include(GNUInstallDirs)
 add_definitions(-Wall)
+
+find_package(PkgConfig)
 
 #########################
 # Configuration options #
 #########################
 
-option(ENABLE_DUMMY "Enable/Disable Dummy platform" ON)
-option(ENABLE_X11 "Enable/Disable X11 platform" ON)
-option(ENABLE_DIRECTFB "Enable/Disable DirectFB platform" ON)
-option(ENABLE_FBDEV "Enable/Disable Linux FBDev platform" ON)
-option(ENABLE_WAYLAND "Enable/Disable Wayland platform" ON)
+option(ENABLE_DUMMY "Dummy platform" ON)
+option(ENABLE_X11 "X11 platform" ON)
+option(ENABLE_DIRECTFB "DirectFB platform" ON)
+option(ENABLE_FBDEV "FBDev platform" ON)
+option(ENABLE_WAYLAND "Wayland platform" ON)
 
-option(ENABLE_EGL "Enable/Disable EGL backend" ON)
-option(ENABLE_GLX "Enable/Disable OpenGL Extension to X11 backend" ON)
-option(ENABLE_DFBGL "Enable/Disable disable OpenGL Extension to DirectFB backend" ON)
-option(ENABLE_GLFBDEV "Enable/Disable disable OpenGL Extension to Linux FBDev backend" ON)
+option(ENABLE_EGL "EGL backend" ON)
+option(ENABLE_GLX "OpenGL Extension to X11 backend" ON)
+option(ENABLE_DFBGL "OpenGL Extension to DirectFB backend" ON)
+option(ENABLE_GLFBDEV "OpenGL Extension to FBDev backend" ON)
 
-option(ENABLE_TESTS "Enable/Disable unit testing" ON)
+option(ENABLE_TESTS "unit testing" ON)
 
 #############
 # Platforms #
@@ -186,6 +185,8 @@ if(ENABLE_TESTS)
   pkg_check_modules(LIBFIU libfiu)
   if(NOT CHECK_FOUND OR NOT LIBFIU_FOUND)
     set(ENABLE_TESTS OFF)
+  else()
+    add_definitions(-DFIU_ENABLE)
   endif()
 endif()
 
@@ -196,21 +197,21 @@ endif()
 message("")
 message("GLUT backends:")
 message("")
-message("  EGL     (Native Platform Graphics Interface)  " ${ENABLE_EGL})
+message("  EGL     (Native Platform Graphics Interface)  ${ENABLE_EGL}")
 if(ENABLE_EGL)
 message("")
 message("           EGL platforms:")
-message("                               X11              " ${ENABLE_X11})
-message("                               DirectFB         " ${ENABLE_DIRECTFB})
-message("                               FBDev            " ${ENABLE_FBDEV})
-message("                               Wayland          " ${ENABLE_WAYLAND})
+message("                               X11              ${ENABLE_X11}")
+message("                               DirectFB         ${ENABLE_DIRECTFB}")
+message("                               FBDev            ${ENABLE_FBDEV}")
+message("                               Wayland          ${ENABLE_WAYLAND}")
 message("")
 endif()
-message("  GLX     (OpenGL Extension to X11)             " ${ENABLE_GLX})
-message("  DFBGL   (OpenGL Extension to DirectFB)        " ${ENABLE_DFBGL})
-message("  GLFBDev (OpenGL Extension to FBDev)           " ${ENABLE_GLFBDEV})
+message("  GLX     (OpenGL Extension to X11)             ${ENABLE_GLX}")
+message("  DFBGL   (OpenGL Extension to DirectFB)        ${ENABLE_DFBGL}")
+message("  GLFBDev (OpenGL Extension to FBDev)           ${ENABLE_GLFBDEV}")
 message("")
-message("Tests: " ${ENABLE_TESTS})
+message("Tests: ${ENABLE_TESTS}")
 message("")
 
 ###############
@@ -219,7 +220,7 @@ message("")
 
 # Platforms plugins
 
-set(PLATFORMS_DIR ${CMAKE_INSTALL_PREFIX}/lib/glut/platforms)
+set(PLATFORMS_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/glut/platforms)
 
 if(ENABLE_DUMMY)
   list(APPEND PLATFORMS_TARGETS dummy_plugin)
@@ -259,7 +260,7 @@ install(TARGETS ${PLATFORMS_TARGETS} DESTINATION ${PLATFORMS_DIR})
 
 # Backends plugins
 
-set(BACKENDS_DIR ${CMAKE_INSTALL_PREFIX}/lib/glut/backends)
+set(BACKENDS_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/glut/backends)
 
 if(ENABLE_EGL)
   list(APPEND BACKENDS_TARGETS egl_plugin)
@@ -317,7 +318,6 @@ configure_file(glut.pc.in glut.pc @ONLY)
 install(FILES glut.pc DESTINATION lib/pkgconfig)
 
 if(ENABLE_TESTS)
-  add_definitions(-DFIU_ENABLE)
   add_executable(glut-tests glut-tests.c)
   target_compile_options(glut-tests PRIVATE ${CHECK_CFLAGS} ${LIBFIU_CFLAGS})
   target_link_libraries(glut-tests glut ${CHECK_LDFLAGS} ${LIBFIU_LDFLAGS})

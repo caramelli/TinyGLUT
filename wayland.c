@@ -1,6 +1,6 @@
 /*
   TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
-  Copyright (c) 2015-2021, Nicolas Caramelli
+  Copyright (c) 2015-2024, Nicolas Caramelli
   
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
@@ -343,11 +343,9 @@ fail:
 int create_window(int dpy, int posx, int posy, int width, int height, int opt, int *err)
 {
   struct wl_display *display = (struct wl_display *)(long)dpy;
-  struct wl_user_data *user_data = NULL;
+  struct wl_user_data *user_data = wl_display_get_user_data(display);
   struct wl_window *window = NULL;
   struct wl_event *event = NULL;
-
-  user_data = wl_display_get_user_data(display);
 
   window = calloc(1, sizeof(struct wl_window));
   if (!window) {
@@ -418,11 +416,10 @@ void destroy_window(int dpy, int win)
 void fini(int dpy)
 {
   struct wl_display *display = (struct wl_display *)(long)dpy;
-  struct wl_user_data *user_data = NULL;
-  struct wl_event *event = NULL;
+  struct wl_user_data *user_data = wl_display_get_user_data(display);
+  struct wl_event *event, *tmp;
 
-  user_data = wl_display_get_user_data(display);
-  wl_list_for_each(event, &user_data->event_list, link) {
+  wl_list_for_each_safe(event, tmp, &user_data->event_list, link) {
     wl_list_remove(&event->link);
     free(event);
   }

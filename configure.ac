@@ -1,5 +1,5 @@
 # TinyGLUT                 Small implementation of GLUT (OpenGL Utility Toolkit)
-# Copyright (c) 2015-2021, Nicolas Caramelli
+# Copyright (c) 2015-2024, Nicolas Caramelli
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -22,21 +22,15 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-AC_INIT(TinyGLUT, 0.5)
+AC_INIT(TinyGLUT, 0.6)
 
 AC_CONFIG_MACRO_DIR([m4])
-
 AM_INIT_AUTOMAKE
-
 LT_INIT(disable-static)
-
 AC_PROG_CC
-
-AM_PROG_CC_C_O
+CFLAGS="$CFLAGS -Wall"
 
 PKG_PROG_PKG_CONFIG
-
-CFLAGS="$CFLAGS -Wall"
 
 #########################
 # Configuration options #
@@ -52,12 +46,11 @@ AC_ARG_ENABLE(directfb,
               AS_HELP_STRING(--disable-directfb, disable DirectFB platform),
               enable_directfb=no, enable_directfb=yes)
 AC_ARG_ENABLE(fbdev,
-              AS_HELP_STRING(--disable-fbdev, disable Linux FBDev platform),
+              AS_HELP_STRING(--disable-fbdev, disable FBDev platform),
               enable_fbdev=no, enable_fbdev=yes)
 AC_ARG_ENABLE(wayland,
               AS_HELP_STRING(--disable-wayland, disable Wayland platform),
               enable_wayland=no, enable_wayland=yes)
-
 
 AC_ARG_ENABLE(egl,
               AS_HELP_STRING(--disable-egl, disable EGL backend),
@@ -69,7 +62,7 @@ AC_ARG_ENABLE(dfbgl,
               AS_HELP_STRING(--disable-dfbgl, disable OpenGL Extension to DirectFB backend),
               enable_dfbgl=no, enable_dfbgl=yes)
 AC_ARG_ENABLE(glfbdev,
-              AS_HELP_STRING(--disable-glfbdev, disable OpenGL Extension to Linux FBDev backend),
+              AS_HELP_STRING(--disable-glfbdev, disable OpenGL Extension to FBDev backend),
               enable_glfbdev=no, enable_glfbdev=yes)
 
 AC_ARG_ENABLE(tests,
@@ -219,23 +212,36 @@ echo
 
 # Platforms plugins
 
+PLATFORMS_DIR=$libdir/glut/platforms
+AC_SUBST(PLATFORMS_DIR)
+
 AM_CONDITIONAL(DUMMY, test x$enable_dummy = xyes)
+
 AM_CONDITIONAL(X11, test x$enable_x11 = xyes)
+
 AM_CONDITIONAL(DIRECTFB, test x$enable_directfb = xyes)
+
 AM_CONDITIONAL(FBDEV, test x$enable_fbdev = xyes)
+
 AM_CONDITIONAL(WAYLAND, test x$enable_wayland = xyes)
 
 # Backends plugins
 
+BACKENDS_DIR=$libdir/glut/backends
+AC_SUBST(BACKENDS_DIR)
+
 AM_CONDITIONAL(EGL, test x$enable_egl = xyes)
+
 AM_CONDITIONAL(GLX, test x$enable_glx = xyes)
+
 AM_CONDITIONAL(DFBGL, test x$enable_dfbgl = xyes)
+
 AM_CONDITIONAL(GLFBDEV, test x$enable_glfbdev = xyes)
 
 # GLUT library
 
-AM_CONDITIONAL(TESTS, test x$enable_tests = xyes)
-
 AC_CONFIG_FILES(Makefile glut.pc)
 
 AC_OUTPUT
+
+AM_CONDITIONAL(TESTS, test x$enable_tests = xyes)
