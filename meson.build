@@ -22,7 +22,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-project('TinyGLUT', 'c', version: '0.6')
+project('TinyGLUT', 'c', version: '0.7')
 
 cc = meson.get_compiler('c')
 
@@ -34,6 +34,7 @@ pkgconfig = import('pkgconfig')
 
 enable_dummy = get_option('dummy')
 enable_x11 = get_option('x11')
+enable_xcb = get_option('xcb')
 enable_directfb = get_option('directfb')
 enable_fbdev = get_option('fbdev')
 enable_wayland = get_option('wayland')
@@ -53,6 +54,13 @@ if enable_x11
   x11_dep = dependency('x11', required: false)
   if not x11_dep.found()
     enable_x11 = false
+  endif
+endif
+
+if enable_xcb
+  xcb_dep = dependency('xcb-keysyms', required: false)
+  if not xcb_dep.found()
+    enable_xcb = false
   endif
 endif
 
@@ -78,7 +86,7 @@ if enable_wayland
   endforeach
 endif
 
-if not enable_dummy and not enable_x11 and not enable_directfb and not enable_fbdev and not enable_wayland
+if not enable_dummy and not enable_x11 and not enable_xcb and not enable_directfb and not enable_fbdev and not enable_wayland
   error('No platforms found')
 endif
 
@@ -113,6 +121,12 @@ if enable_x11
   endif
 else
   enable_glx = false
+endif
+
+if enable_xcb
+  if not enable_egl
+    enable_xcb = false
+  endif
 endif
 
 if enable_directfb
@@ -191,6 +205,7 @@ if enable_egl
 message('')
 message('           EGL platforms:')
 message('                               X11              @0@'.format(enable_x11))
+message('                               XCB              @0@'.format(enable_xcb))
 message('                               DirectFB         @0@'.format(enable_directfb))
 message('                               FBDev            @0@'.format(enable_fbdev))
 message('                               Wayland          @0@'.format(enable_wayland))
@@ -221,6 +236,14 @@ endif
 if enable_x11
   x11_plugin = library('x11_plugin', 'x11.c',
                        dependencies: x11_dep,
+                       name_prefix: '',
+                       install: true,
+                       install_dir: platformsdir)
+endif
+
+if enable_xcb
+  xcb_plugin = library('xcb_plugin', 'xcb.c',
+                       dependencies: xcb_dep,
                        name_prefix: '',
                        install: true,
                        install_dir: platformsdir)

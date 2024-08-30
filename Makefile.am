@@ -41,6 +41,14 @@ x11_plugin_la_LIBADD = @X11_LIBS@
 x11_plugin_la_LDFLAGS = -module -avoid-version
 endif
 
+if XCB
+platforms_LTLIBRARIES += xcb_plugin.la
+xcb_plugin_la_SOURCES = xcb.c
+xcb_plugin_la_CFLAGS = @XCB_CFLAGS@
+xcb_plugin_la_LIBADD = @XCB_LIBS@
+xcb_plugin_la_LDFLAGS = -module -avoid-version
+endif
+
 if DIRECTFB
 platforms_LTLIBRARIES += directfb_plugin.la
 directfb_plugin_la_SOURCES = directfb.c

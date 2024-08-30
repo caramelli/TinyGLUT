@@ -22,7 +22,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-AC_INIT(TinyGLUT, 0.6)
+AC_INIT(TinyGLUT, 0.7)
 
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE
@@ -42,6 +42,9 @@ AC_ARG_ENABLE(dummy,
 AC_ARG_ENABLE(x11,
               AS_HELP_STRING(--disable-x11, disable X11 platform),
               enable_x11=no, enable_x11=yes)
+AC_ARG_ENABLE(xcb,
+              AS_HELP_STRING(--disable-xcb, disable XCB platform),
+              enable_xcb=no, enable_xcb=yes)
 AC_ARG_ENABLE(directfb,
               AS_HELP_STRING(--disable-directfb, disable DirectFB platform),
               enable_directfb=no, enable_directfb=yes)
@@ -77,6 +80,10 @@ if test x$enable_x11 = xyes; then
   PKG_CHECK_MODULES(X11, x11, , enable_x11=no)
 fi
 
+if test x$enable_xcb = xyes; then
+  PKG_CHECK_MODULES(XCB, xcb-keysyms, , enable_xcb=no)
+fi
+
 if test x$enable_directfb = xyes; then
   PKG_CHECK_MODULES(DIRECTFB, directfb, , enable_directfb=no)
 fi
@@ -89,7 +96,7 @@ if test x$enable_wayland = xyes; then
   PKG_CHECK_MODULES(WAYLAND, wayland-client xkbcommon, , enable_wayland=no)
 fi
 
-if test x$enable_dummy = xno -a x$enable_x11 = xno -a x$enable_directfb = xno -a x$enable_fbdev = xno -a x$enable_wayland = xno; then
+if test x$enable_dummy = xno -a x$enable_x11 = xno -a x$enable_xcb = xno -a x$enable_directfb = xno -a x$enable_fbdev = xno -a x$enable_wayland = xno; then
   AC_MSG_ERROR(No platforms found)
 fi
 
@@ -122,6 +129,12 @@ if test x$enable_x11 = xyes; then
   fi
 else
   enable_glx=no
+fi
+
+if test x$enable_xcb = xyes; then
+  if test x$enable_egl = xno; then
+    enable_xcb=no
+  fi
 fi
 
 if test x$enable_directfb = xyes; then
@@ -194,6 +207,7 @@ if test x$enable_egl = xyes; then
 echo
 echo "           EGL platforms:"
 echo "                               X11              $enable_x11"
+echo "                               XCB              $enable_xcb"
 echo "                               DirectFB         $enable_directfb"
 echo "                               FBDev            $enable_fbdev"
 echo "                               Wayland          $enable_wayland"
@@ -218,6 +232,8 @@ AC_SUBST(PLATFORMS_DIR)
 AM_CONDITIONAL(DUMMY, test x$enable_dummy = xyes)
 
 AM_CONDITIONAL(X11, test x$enable_x11 = xyes)
+
+AM_CONDITIONAL(XCB, test x$enable_xcb = xyes)
 
 AM_CONDITIONAL(DIRECTFB, test x$enable_directfb = xyes)
 

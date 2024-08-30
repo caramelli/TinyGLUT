@@ -28,6 +28,9 @@ option('dummy',
 option('x11',
        type: 'boolean',
        description: 'X11 platform')
+option('xcb',
+       type: 'boolean',
+       description: 'XCB platform')
 option('directfb',
        type: 'boolean',
        description: 'DirectFB platform')
