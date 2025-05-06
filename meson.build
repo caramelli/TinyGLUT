@@ -191,6 +191,8 @@ if enable_tests
   else
     add_global_arguments('-DFIU_ENABLE', language: 'c')
   endif
+else
+  libfiu_dep = disabler()
 endif
 
 #######################
